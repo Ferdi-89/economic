@@ -270,16 +270,20 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              isSimulated
-                  ? 'Asli NW: Rp${fmt.format(netWorth.toInt())} - Wishlist: Rp${fmt.format(wishlistDeduction.toInt())}'
-                  : 'Aset: Rp${fmt.format(actualBalance.toInt())} · Hutang: Rp${fmt.format(totalDebts.toInt())} · Piutang: Rp${fmt.format(totalLoans.toInt())}',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white24, height: 1),
+            const SizedBox(height: 12),
+            if (isSimulated) ...[
+              _buildNetWorthDetailRow('NW Asli', 'Rp${fmt.format(netWorth.toInt())}'),
+              const SizedBox(height: 6),
+              _buildNetWorthDetailRow('Potongan Wishlist', '-Rp${fmt.format(wishlistDeduction.toInt())}', color: Colors.amberAccent),
+            ] else ...[
+              _buildNetWorthDetailRow('Total Aset (Rekening)', 'Rp${fmt.format(actualBalance.toInt())}'),
+              const SizedBox(height: 6),
+              _buildNetWorthDetailRow('Hutang Saya', '-Rp${fmt.format(totalDebts.toInt())}', color: Colors.redAccent[100]),
+              const SizedBox(height: 6),
+              _buildNetWorthDetailRow('Piutang (Pinjaman)', '+Rp${fmt.format(totalLoans.toInt())}', color: Colors.greenAccent[100]),
+            ],
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -618,6 +622,26 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildNetWorthDetailRow(String label, String value, {Color? color}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: color ?? Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 

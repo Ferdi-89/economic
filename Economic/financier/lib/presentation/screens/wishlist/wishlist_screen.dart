@@ -6,6 +6,8 @@ import '../dashboard/wishlist_provider.dart';
 import '../../../data/repositories/account_repository.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/models/account.dart';
+import '../../../data/repositories/category_repository.dart';
+
 
 final wishlistAccountsProvider = FutureProvider.autoDispose<List<Account>>((ref) async {
   final userId = ref.read(authRepositoryProvider).currentUser!.id;
@@ -244,13 +246,23 @@ class WishlistScreen extends ConsumerWidget {
                         ),
                         if (item.url != null) ...[
                           IconButton(
-                            icon: Icon(Icons.link, color: theme.colorScheme.primary),
+                            icon: Icon(Icons.link, color: theme.colorScheme.primary, size: 20),
                             tooltip: 'Buka Link Barang',
                             onPressed: () => _launchUrl(context, item.url!),
                           ),
                         ],
                         IconButton(
-                          icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+                          icon: Icon(Icons.shopping_cart_checkout, color: Colors.green[700], size: 20),
+                          tooltip: 'Beli Barang',
+                          onPressed: () => _showPurchaseDialog(context, ref, item),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.edit_outlined, color: theme.colorScheme.secondary, size: 20),
+                          tooltip: 'Edit Barang',
+                          onPressed: () => _showEditWishlistDialog(context, ref, item),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline, color: theme.colorScheme.error, size: 20),
                           onPressed: () {
                             ref.read(wishlistProvider.notifier).remove(item.id);
                           },
@@ -370,6 +382,160 @@ class WishlistScreen extends ConsumerWidget {
                   final price = double.parse(priceController.text.replaceAll('.', ''));
                   final url = urlController.text.trim();
                   ref.read(wishlistProvider.notifier).add(name, price, url.isNotEmpty ? url : null);
+                  ref.invalidate(wishlistAccountsProvider); // Refresh balance
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPurchaseDialog(BuildContext context, WidgetRef ref, WishlistItem item) async {
+    final accounts = ref.read(wishlistAccountsProvider).value ?? [];
+    if (accounts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Anda belum memiliki rekening')),
+      );
+      return;
+    }
+
+    final userId = ref.read(authRepositoryProvider).currentUser!.id;
+    final categories = await ref.read(categoryRepositoryProvider).getAll(userId, type: 'expense');
+
+    String? selectedAccountId = accounts.first.id;
+    String? selectedCategoryId = categories.isNotEmpty ? categories.first.id : null;
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (dCtx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Beli: ${item.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedAccountId,
+                    decoration: const InputDecoration(labelText: 'Sumber Rekening'),
+                    items: accounts
+                        .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
+                        .toList(),
+                    onChanged: (v) => setState(() => selectedAccountId = v),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: selectedCategoryId,
+                    decoration: const InputDecoration(labelText: 'Kategori Pengeluaran'),
+                    items: categories
+                        .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                        .toList(),
+                    onChanged: (v) => setState(() => selectedCategoryId = v),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Batal')),
+                FilledButton(
+                  onPressed: () async {
+                    if (selectedAccountId == null || selectedCategoryId == null) return;
+                    await ref.read(wishlistProvider.notifier).purchase(
+                          item.id,
+                          selectedAccountId!,
+                          selectedCategoryId!,
+                        );
+                    ref.invalidate(wishlistAccountsProvider); // Refresh balances
+                    if (dCtx.mounted) Navigator.pop(dCtx);
+                  },
+                  child: const Text('Beli'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditWishlistDialog(BuildContext context, WidgetRef ref, WishlistItem item) {
+    final nameController = TextEditingController(text: item.name);
+    final priceController = TextEditingController(text: item.price.toInt().toString());
+    final urlController = TextEditingController(text: item.url ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Edit Barang Wishlist', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nama Barang',
+                      prefixIcon: Icon(Icons.shopping_bag_outlined),
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Nama barang harus diisi' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: priceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Harga (Rp)',
+                      prefixIcon: Icon(Icons.payments_outlined),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Harga harus diisi';
+                      final parsed = double.tryParse(v.replaceAll('.', ''));
+                      if (parsed == null || parsed <= 0) return 'Harga harus lebih dari 0';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: urlController,
+                    decoration: const InputDecoration(
+                      labelText: 'Link Barang (opsional)',
+                      prefixIcon: Icon(Icons.link_outlined),
+                      hintText: 'https://...',
+                    ),
+                    keyboardType: TextInputType.url,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final uri = Uri.tryParse(v.trim());
+                      if (uri == null || !uri.hasScheme) return 'Link tidak valid';
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  final name = nameController.text.trim();
+                  final price = double.parse(priceController.text.replaceAll('.', ''));
+                  final url = urlController.text.trim();
+                  ref.read(wishlistProvider.notifier).updateItem(item.id, name, price, url.isNotEmpty ? url : null);
                   ref.invalidate(wishlistAccountsProvider); // Refresh balance
                   Navigator.pop(context);
                 }

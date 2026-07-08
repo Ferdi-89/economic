@@ -90,7 +90,7 @@ class WishlistNotifier extends StateNotifier<List<WishlistItem>> {
     // Check storage strategy
     try {
       final res = await SupabaseConfig.client
-          .from('wishlist_items')
+          .from('wishlist')
           .select()
           .eq('user_id', user.id);
       
@@ -143,13 +143,13 @@ class WishlistNotifier extends StateNotifier<List<WishlistItem>> {
         }).toList();
 
         await SupabaseConfig.client
-            .from('wishlist_items')
+            .from('wishlist')
             .delete()
             .eq('user_id', user.id);
 
         if (dbList.isNotEmpty) {
           await SupabaseConfig.client
-              .from('wishlist_items')
+              .from('wishlist')
               .insert(dbList);
         }
       } catch (_) {
@@ -173,12 +173,71 @@ class WishlistNotifier extends StateNotifier<List<WishlistItem>> {
 
   void add(String name, double price, [String? url]) {
     final newItem = WishlistItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: SupabaseConfig.client.auth.currentUser != null
+          ? null as dynamic // Let database generate UUID if online, otherwise use timestamp
+          : DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       price: price,
       url: url != null && url.trim().isNotEmpty ? url.trim() : null,
     );
-    state = [...state, newItem];
+    // If online, we let the database save generate its ID. But for local list first:
+    final localId = DateTime.now().millisecondsSinceEpoch.toString();
+    state = [...state, newItem.copyWith(id: newItem.id ?? localId)];
+    _save();
+  }
+
+  void updateItem(String id, String name, double price, String? url) {
+    state = state.map((item) {
+      if (item.id == id) {
+        return item.copyWith(
+          name: name,
+          price: price,
+          url: url != null && url.trim().isNotEmpty ? url.trim() : null,
+        );
+      }
+      return item;
+    }).toList();
+    _save();
+  }
+
+  Future<void> purchase(String itemId, String accountId, String categoryId) async {
+    final item = state.firstWhere((e) => e.id == itemId);
+    final user = _ref.read(authRepositoryProvider).currentUser;
+    if (user == null) return;
+
+    try {
+      // 1. Insert transaction
+      final txData = {
+        'user_id': user.id,
+        'account_id': accountId,
+        'category_id': categoryId,
+        'type': 'expense',
+        'amount': item.price,
+        'date': DateTime.now().toIso8601String().split('T')[0],
+        'note': 'Beli Wishlist: ${item.name}',
+        'status': 'completed',
+      };
+      await SupabaseConfig.client.from('transactions').insert(txData);
+
+      // 2. Deduct balance
+      final accRes = await SupabaseConfig.client
+          .from('accounts')
+          .select('balance')
+          .eq('id', accountId)
+          .single();
+      final double currentBalance = (accRes['balance'] as num).toDouble();
+      await SupabaseConfig.client
+          .from('accounts')
+          .update({'balance': currentBalance - item.price})
+          .eq('id', accountId);
+
+      // 3. Delete wishlist item
+      await SupabaseConfig.client.from('wishlist').delete().eq('id', itemId);
+    } catch (_) {
+      // Offline fallback: delete local item anyway
+    }
+
+    state = state.where((item) => item.id != itemId).toList();
     _save();
   }
 

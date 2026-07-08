@@ -138,19 +138,17 @@ class TransactionFormScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SegmentedButton<String>(
+              showSelectedIcon: false,
               segments: const [
                 ButtonSegment(
                     value: 'expense',
-                    label: Text('Pengeluaran'),
-                    icon: Icon(Icons.arrow_upward)),
+                    label: Icon(Icons.arrow_upward, size: 20)),
                 ButtonSegment(
                     value: 'income',
-                    label: Text('Pemasukan'),
-                    icon: Icon(Icons.arrow_downward)),
+                    label: Icon(Icons.arrow_downward, size: 20)),
                 ButtonSegment(
                     value: 'transfer',
-                    label: Text('Transfer'),
-                    icon: Icon(Icons.swap_horiz)),
+                    label: Icon(Icons.swap_horiz, size: 20)),
               ],
               selected: {form.type},
               onSelectionChanged: (v) {
