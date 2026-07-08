@@ -78,7 +78,7 @@ function updateUserUI() {
 // ── Data loading ──
 async function loadAll() {
   try {
-    await Promise.all([fetchAccounts(), fetchCategories(), fetchTransactions(), fetchBudgets()]);
+    await Promise.all([fetchAccounts(), fetchCategories(), fetchTransactions(), fetchBudgets(), fetchWishlist()]);
   } catch (e) {
     console.error('loadAll error:', e);
   }
@@ -106,8 +106,23 @@ async function fetchBudgets() {
   }
 }
 async function fetchWishlist() {
-  const { data, error } = await sb.from('wishlist').select('*').eq('user_id', USER.id).order('created_at');
-  if (!error) WISHLIST = data || [];
+  try {
+    const { data, error } = await sb.from('wishlist').select('*').eq('user_id', USER.id).order('created_at');
+    if (error) throw error;
+    WISHLIST = (data || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      url: item.url,
+      isEnabled: item.is_enabled ?? true
+    }));
+  } catch (e) {
+    console.warn('Gagal memuat wishlist dari database, menggunakan local storage:', e.message);
+    const localData = localStorage.getItem('wishlist_items');
+    if (localData) {
+      try { WISHLIST = JSON.parse(localData); } catch(_) { WISHLIST = []; }
+    }
+  }
 }
 
 // ── Render all ──
@@ -902,7 +917,7 @@ function initWishlist() {
     // Prevent duplicate event listener registration
     const newForm = form.cloneNode(true);
     form.parentNode.replaceChild(newForm, form);
-    newForm.addEventListener('submit', e => {
+    newForm.addEventListener('submit', async e => {
       e.preventDefault();
       const name = $('wish-name').value.trim();
       const price = parseFloat($('wish-price').value) || 0;
@@ -910,18 +925,52 @@ function initWishlist() {
       if (!name) return alert('Nama barang wajib diisi');
       if (price <= 0) return alert('Harga barang harus lebih dari 0');
       
-      const item = {
-        id: Date.now().toString(),
-        name,
-        price,
-        url: url || null,
-        isEnabled: true
-      };
-      
-      WISHLIST.push(item);
-      saveWishlist();
-      closeModal('modal-wishlist');
-      renderAll();
+      showLoader();
+      try {
+        const newItem = {
+          user_id: USER.id,
+          name,
+          price,
+          url: url || null,
+          is_enabled: true
+        };
+        
+        const { data: dbItem, error } = await sb.from('wishlist').insert(newItem).select().single();
+        if (error) throw error;
+        
+        if (dbItem) {
+          WISHLIST.push({
+            id: dbItem.id,
+            name: dbItem.name,
+            price: dbItem.price,
+            url: dbItem.url,
+            isEnabled: dbItem.is_enabled ?? true
+          });
+        } else {
+          newItem.id = Date.now().toString();
+          newItem.isEnabled = true;
+          WISHLIST.push(newItem);
+        }
+        saveWishlistLocal();
+        closeModal('modal-wishlist');
+        renderAll();
+      } catch(err) {
+        console.warn('Gagal menyimpan ke database Supabase, menyimpan lokal:', err.message);
+        // Fallback to local storage
+        const item = {
+          id: Date.now().toString(),
+          name,
+          price,
+          url: url || null,
+          isEnabled: true
+        };
+        WISHLIST.push(item);
+        saveWishlistLocal();
+        closeModal('modal-wishlist');
+        renderAll();
+      } finally {
+        hideLoader();
+      }
     });
   }
   
@@ -936,25 +985,41 @@ function initWishlist() {
   }
 }
 
-function saveWishlist() {
+function saveWishlistLocal() {
   localStorage.setItem('wishlist_items', JSON.stringify(WISHLIST));
 }
 
-function deleteWishlistItem(id) {
+async function deleteWishlistItem(id) {
+  if (!confirm('Hapus barang ini dari wishlist?')) return;
+  showLoader();
+  try {
+    const { error } = await sb.from('wishlist').delete().eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.warn('Gagal menghapus dari database, melakukan hapus lokal:', err.message);
+  }
   WISHLIST = WISHLIST.filter(item => item.id !== id);
-  saveWishlist();
+  saveWishlistLocal();
   renderAll();
+  hideLoader();
 }
 
-function toggleWishlistItem(id) {
-  WISHLIST = WISHLIST.map(item => {
-    if (item.id === id) {
-      return { ...item, isEnabled: !item.isEnabled };
-    }
-    return item;
-  });
-  saveWishlist();
+async function toggleWishlistItem(id) {
+  const item = WISHLIST.find(i => i.id === id);
+  if (!item) return;
+  const nextState = !item.isEnabled;
+  
+  showLoader();
+  try {
+    const { error } = await sb.from('wishlist').update({ is_enabled: nextState }).eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.warn('Gagal memperbarui database, melakukan pembaruan lokal:', err.message);
+  }
+  item.isEnabled = nextState;
+  saveWishlistLocal();
   renderAll();
+  hideLoader();
 }
 
 function renderWishlist() {
