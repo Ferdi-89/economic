@@ -190,47 +190,90 @@ function renderDashboard() {
 // ── Transactions ──
 function renderTransactions() {
   let list = [...TRANSACTIONS];
-  if (txFilter.q)    list = list.filter(t => (t.notes||'').toLowerCase().includes(txFilter.q.toLowerCase()));
-  if (txFilter.type) list = list.filter(t => t.type === txFilter.type);
-  if (txFilter.month) list = list.filter(t => t.date?.startsWith(txFilter.month));
+  if (txFilter.q) {
+    list = list.filter(t => (t.notes || '').toLowerCase().includes(txFilter.q.toLowerCase()));
+  }
+  if (txFilter.type) {
+    list = list.filter(t => t.type === txFilter.type);
+  }
+  if (txFilter.month) {
+    list = list.filter(t => t.date?.startsWith(txFilter.month));
+  }
 
   const el = $('tx-list');
   if (!list.length) {
     el.innerHTML = '<div class="empty-msg">Tidak ada transaksi yang sesuai</div>';
     return;
   }
-  el.innerHTML = list.map(t => `
-    <div class="tx-item">
-      <div class="tx-type-badge ${t.type}">${typeIcon(t.type)}</div>
-      <div class="tx-body">
-        <div class="tx-note">${t.notes || '–'}</div>
-        <div class="tx-meta">${categoryName(t.category_id)} · ${accountName(t.account_id)}</div>
-      </div>
-      <div class="tx-right">
-        <div class="tx-amount ${t.type}">${t.type === 'income' ? '+' : t.type === 'expense' ? '-' : '⇄'} ${idr(t.amount)}</div>
-        <div class="tx-date">${formatDate(t.date)}</div>
-      </div>
-      <div class="tx-actions">
-        <button class="btn-icon" onclick="editTx('${t.id}')" title="Edit">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        </button>
-        <button class="btn-icon btn-danger" onclick="deleteTx('${t.id}')" title="Hapus">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-        </button>
-      </div>
-    </div>`).join('');
+  
+  el.innerHTML = list.map(t => {
+    const isIncome = t.type === 'income';
+    const isExpense = t.type === 'expense';
+    const isTransfer = t.type === 'transfer';
+    
+    // Amount formatting with correct sign prefix
+    const sign = isIncome ? '+' : (isExpense ? '-' : '⇄ ');
+    const formattedAmount = `${sign}${idr(t.amount)}`;
+    
+    // Descriptive account transfer flow
+    const accountInfo = isTransfer 
+      ? `${accountName(t.account_id)} → ${accountName(t.transfer_to_account_id)}`
+      : accountName(t.account_id);
+      
+    // Meta information (Category + Account details)
+    const metaDetails = isTransfer 
+      ? `Transfer · ${accountInfo}`
+      : `${categoryName(t.category_id)} · ${accountInfo}`;
+
+    return `
+      <div class="tx-item">
+        <div class="tx-type-badge ${t.type}">${typeIcon(t.type)}</div>
+        <div class="tx-body">
+          <div class="tx-note">${t.notes || (isTransfer ? 'Transfer Uang' : 'Tanpa Catatan')}</div>
+          <div class="tx-meta">${metaDetails}</div>
+        </div>
+        <div class="tx-right">
+          <div class="tx-amount ${t.type}">${formattedAmount}</div>
+          <div class="tx-date">${formatDate(t.date)}</div>
+        </div>
+        <div class="tx-actions">
+          <button class="btn-icon" onclick="editTx('${t.id}')" title="Edit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button class="btn-icon btn-danger" onclick="deleteTx('${t.id}')" title="Hapus">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 function txItemHTML(t) {
+  const isIncome = t.type === 'income';
+  const isExpense = t.type === 'expense';
+  const isTransfer = t.type === 'transfer';
+  
+  const sign = isIncome ? '+' : (isExpense ? '-' : '⇄ ');
+  const formattedAmount = `${sign}${idr(t.amount)}`;
+  
+  const accountInfo = isTransfer
+    ? `${accountName(t.account_id)} → ${accountName(t.transfer_to_account_id)}`
+    : accountName(t.account_id);
+    
+  const title = t.notes || (isTransfer ? 'Transfer Uang' : categoryName(t.category_id) || '–');
+  const subtitle = isTransfer 
+    ? accountInfo
+    : `${accountInfo} · ${formatDate(t.date)}`;
+
   return `
     <div class="mini-item">
       <div class="mini-icon ${t.type}">${typeIcon(t.type)}</div>
       <div class="mini-info">
-        <div class="mini-title">${t.notes || categoryName(t.category_id) || '–'}</div>
-        <div class="mini-sub">${accountName(t.account_id)} · ${formatDate(t.date)}</div>
+        <div class="mini-title">${title}</div>
+        <div class="mini-sub">${subtitle}</div>
       </div>
       <div class="mini-right">
-        <div class="mini-amount ${t.type}">${t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}${idr(t.amount)}</div>
+        <div class="mini-amount ${t.type}">${formattedAmount}</div>
       </div>
     </div>`;
 }
