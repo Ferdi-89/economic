@@ -63,7 +63,10 @@ class WishlistScreen extends ConsumerWidget {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(wishlistAccountsProvider.future),
+        onRefresh: () async {
+          await ref.read(wishlistProvider.notifier).refresh();
+          await ref.refresh(wishlistAccountsProvider.future);
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [

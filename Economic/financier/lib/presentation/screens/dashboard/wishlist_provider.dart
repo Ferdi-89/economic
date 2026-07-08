@@ -69,6 +69,10 @@ class WishlistNotifier extends StateNotifier<List<WishlistItem>> {
     _load();
   }
 
+  Future<void> refresh() async {
+    await _load();
+  }
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     

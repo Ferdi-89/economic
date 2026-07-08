@@ -132,7 +132,12 @@ async function fetchTransactions() {
 }
 async function fetchBudgets() {
   const { data: budgets, error: e1 } = await sb.from('budgets').select('*').eq('user_id', USER.id).eq('is_active', true);
-  if (!e1) BUDGETS = budgets || [];
+  if (!e1) {
+    BUDGETS = (budgets || []).map(b => ({
+      ...b,
+      monthly_limit: b.amount ? parseFloat(b.amount) : 0
+    }));
+  }
   if (BUDGETS.length) {
     const ids = BUDGETS.map(b => b.id);
     const { data: items, error: e2 } = await sb.from('budget_items').select('*').in('budget_id', ids);
@@ -399,7 +404,9 @@ function renderBudgets() {
             <span class="bud-name">${b.name}</span>
             <span class="bud-period">Bulan Ini</span>
           </div>
-          <button class="btn-icon" onclick="deleteBudget('${b.id}')" title="Hapus">🗑️</button>
+          <button class="btn-icon btn-danger" onclick="deleteBudget('${b.id}')" title="Hapus">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
         </div>
         <div class="bud-numbers">
           <span class="bud-spent" style="color:${over?'var(--red)':'inherit'}">${idr(spent)}</span>
@@ -411,7 +418,7 @@ function renderBudgets() {
         </div>
         <div class="bud-meta">
           <span class="bud-pct${over?' over':''}">${pct}% terpakai</span>
-          <span>${over ? 'Melebihi Limit! ⚠️' : 'Aman'}</span>
+          <span>${over ? 'Melebihi Limit!' : 'Aman'}</span>
         </div>
         ${catNames.length ? `<div class="bud-tags">${catNames.map(n=>`<span class="bud-tag">${n}</span>`).join('')}</div>` : ''}
       </div>`;
@@ -850,7 +857,7 @@ $('form-budget').addEventListener('submit', async e => {
 
   showLoader();
   try {
-    const { data: bud, error } = await sb.from('budgets').insert({ user_id: USER.id, name, monthly_limit: amount, color, is_active: true }).select().single();
+    const { data: bud, error } = await sb.from('budgets').insert({ user_id: USER.id, name, amount: amount, color, is_active: true }).select().single();
     if (error) throw error;
     if (catIds.length && bud) {
       await sb.from('budget_items').insert(catIds.map(cid => ({ budget_id: bud.id, category_id: cid })));
@@ -1075,6 +1082,7 @@ function initWishlist() {
     form.parentNode.replaceChild(newForm, form);
     newForm.addEventListener('submit', async e => {
       e.preventDefault();
+      const id = $('wish-edit-id').value;
       const name = $('wish-name').value.trim();
       const price = parseFloat($('wish-price').value) || 0;
       const url = $('wish-url').value.trim();
@@ -1083,47 +1091,56 @@ function initWishlist() {
       
       showLoader();
       try {
-        const newItem = {
-          user_id: USER.id,
-          name,
-          price,
-          url: url || null,
-          is_enabled: true
-        };
-        
-        const { data: dbItem, error } = await sb.from('wishlist').insert(newItem).select().single();
-        if (error) throw error;
-        
-        if (dbItem) {
-          WISHLIST.push({
-            id: dbItem.id,
-            name: dbItem.name,
-            price: dbItem.price,
-            url: dbItem.url,
-            isEnabled: dbItem.is_enabled ?? true
-          });
+        if (id) {
+          // Editing existing item
+          const { data: dbItem, error } = await sb.from('wishlist').update({
+            name,
+            price,
+            url: url || null
+          }).eq('id', id).select().single();
+          if (error) throw error;
+          
+          const idx = WISHLIST.findIndex(item => item.id === id);
+          if (idx !== -1) {
+            WISHLIST[idx] = {
+              ...WISHLIST[idx],
+              name: dbItem ? dbItem.name : name,
+              price: dbItem ? dbItem.price : price,
+              url: dbItem ? dbItem.url : (url || null)
+            };
+          }
         } else {
-          newItem.id = Date.now().toString();
-          newItem.isEnabled = true;
-          WISHLIST.push(newItem);
+          // Adding new item
+          const newItem = {
+            user_id: USER.id,
+            name,
+            price,
+            url: url || null,
+            is_enabled: true
+          };
+          
+          const { data: dbItem, error } = await sb.from('wishlist').insert(newItem).select().single();
+          if (error) throw error;
+          
+          if (dbItem) {
+            WISHLIST.push({
+              id: dbItem.id,
+              name: dbItem.name,
+              price: dbItem.price,
+              url: dbItem.url,
+              isEnabled: dbItem.is_enabled ?? true
+            });
+          } else {
+            newItem.id = Date.now().toString();
+            newItem.isEnabled = true;
+            WISHLIST.push(newItem);
+          }
         }
         saveWishlistLocal();
         closeModal('modal-wishlist');
         renderAll();
-      } catch(err) {
-        console.warn('Gagal menyimpan ke database Supabase, menyimpan lokal:', err.message);
-        // Fallback to local storage
-        const item = {
-          id: Date.now().toString(),
-          name,
-          price,
-          url: url || null,
-          isEnabled: true
-        };
-        WISHLIST.push(item);
-        saveWishlistLocal();
-        closeModal('modal-wishlist');
-        renderAll();
+      } catch (err) {
+        alert('Gagal menyimpan: ' + err.message);
       } finally {
         hideLoader();
       }
@@ -1135,6 +1152,9 @@ function initWishlist() {
     const newBtnAdd = btnAdd.cloneNode(true);
     btnAdd.parentNode.replaceChild(newBtnAdd, btnAdd);
     newBtnAdd.addEventListener('click', () => {
+      $('wish-edit-id').value = '';
+      document.querySelector('#modal-wishlist h3').textContent = 'Tambah Barang Wishlist';
+      $('wish-submit').textContent = 'Simpan Barang';
       $('form-wishlist').reset();
       openModal('modal-wishlist');
     });
@@ -1195,6 +1215,93 @@ async function toggleWishlistItem(id) {
   }
 }
 
+function editWishlistItem(id) {
+  const item = WISHLIST.find(i => i.id === id);
+  if (!item) return;
+  
+  $('wish-edit-id').value = item.id;
+  document.querySelector('#modal-wishlist h3').textContent = 'Edit Barang Wishlist';
+  $('wish-submit').textContent = 'Update Barang';
+  $('wish-name').value = item.name;
+  $('wish-price').value = item.price;
+  $('wish-url').value = item.url || '';
+  
+  openModal('modal-wishlist');
+}
+
+function purchaseWishlistItem(id) {
+  const item = WISHLIST.find(i => i.id === id);
+  if (!item) return;
+  
+  $('purchase-wish-item-id').value = item.id;
+  $('purchase-wish-prompt').textContent = `Beli "${item.name}" seharga ${idr(item.price)} dan catat sebagai transaksi pengeluaran?`;
+  
+  // Populate selects
+  const accSelect = $('purchase-wish-account');
+  accSelect.innerHTML = ACCOUNTS.map(a => `<option value="${a.id}">${a.name} (${a.bank_name || 'Tanpa Bank'}) - Saldo: ${idr(a.balance)}</option>`).join('');
+  
+  const expenseCats = CATEGORIES.filter(c => c.type === 'expense');
+  const catSelect = $('purchase-wish-category');
+  catSelect.innerHTML = expenseCats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  
+  openModal('modal-purchase-wishlist');
+}
+
+// Bind form submit for purchasing wishlist item
+if ($('form-purchase-wishlist')) {
+  $('form-purchase-wishlist').addEventListener('submit', async e => {
+    e.preventDefault();
+    const itemId = $('purchase-wish-item-id').value;
+    const accountId = $('purchase-wish-account').value;
+    const categoryId = $('purchase-wish-category').value;
+    
+    const item = WISHLIST.find(i => i.id === itemId);
+    if (!item || !accountId || !categoryId) return;
+    
+    showLoader();
+    try {
+      // 1. Insert transaction
+      const txData = {
+        user_id: USER.id,
+        account_id: accountId,
+        category_id: categoryId,
+        type: 'expense',
+        amount: item.price,
+        date: today(),
+        note: `Beli Wishlist: ${item.name}`,
+        status: 'completed'
+      };
+      const { error: txErr } = await sb.from('transactions').insert(txData);
+      if (txErr) throw txErr;
+      
+      // 2. Deduct balance
+      const account = ACCOUNTS.find(a => a.id === accountId);
+      if (account) {
+        const newBal = (parseFloat(account.balance) || 0) - item.price;
+        const { error: accErr } = await sb.from('accounts').update({ balance: newBal }).eq('id', accountId);
+        if (accErr) throw accErr;
+        account.balance = newBal;
+      }
+      
+      // 3. Delete wishlist item
+      const { error: delErr } = await sb.from('wishlist').delete().eq('id', itemId);
+      if (delErr) throw delErr;
+      
+      // 4. Update local state
+      WISHLIST = WISHLIST.filter(i => i.id !== itemId);
+      saveWishlistLocal();
+      
+      closeModal('modal-purchase-wishlist');
+      await loadAll();
+      renderAll();
+    } catch (err) {
+      alert('Gagal menyelesaikan pembelian: ' + err.message);
+    } finally {
+      hideLoader();
+    }
+  });
+}
+
 function renderWishlist() {
   const listEl = $('wishlist-items-list');
   if (!listEl) return;
@@ -1243,6 +1350,12 @@ function renderWishlist() {
         </div>
         <div style="display: flex; align-items: center; gap: 4px;">
           ${linkBtn}
+          <button class="btn-icon" onclick="purchaseWishlistItem('${item.id}')" title="Beli Barang" style="color: var(--green); display: inline-flex; align-items: center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+          </button>
+          <button class="btn-icon" onclick="editWishlistItem('${item.id}')" title="Edit Barang" style="color: var(--text-secondary); display: inline-flex; align-items: center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
           <button class="btn-icon btn-danger" onclick="deleteWishlistItem('${item.id}')" title="Hapus">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
           </button>
@@ -1254,6 +1367,8 @@ function renderWishlist() {
 
 // Bind to window to allow inline html event calls
 window.toggleWishlistItem = toggleWishlistItem;
+window.editWishlistItem = editWishlistItem;
+window.purchaseWishlistItem = purchaseWishlistItem;
 window.deleteWishlistItem = deleteWishlistItem;
 window.toggleBillStatus = toggleBillStatus;
 window.deleteBill = deleteBill;

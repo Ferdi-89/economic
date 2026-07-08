@@ -75,7 +75,7 @@ class BudgetDetailScreen extends ConsumerWidget {
                                 borderRadius:
                                     BorderRadius.circular(8)),
                             child: Text(
-                                '⚠️ Over Budget! ${(b.percentage * 100 - 100).toStringAsFixed(0)}% melebihi batas',
+                                'Over Budget! ${(b.percentage * 100 - 100).toStringAsFixed(0)}% melebihi batas',
                                 style: const TextStyle(
                                     color: Colors.red,
                                     fontWeight: FontWeight.w600))),

@@ -603,6 +603,7 @@
       <button class="modal-close-icon modal-close" data-modal="modal-wishlist">&times;</button>
     </div>
     <form id="form-wishlist">
+      <input type="hidden" id="wish-edit-id">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Nama Barang *</label>
@@ -620,6 +621,34 @@
       <div class="modal-foot">
         <button type="button" class="btn btn-ghost modal-close" data-modal="modal-wishlist">Batal</button>
         <button type="submit" class="btn btn-primary" id="wish-submit">Simpan Barang</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ MODAL: BELI WISHLIST ═══ -->
+<div id="modal-purchase-wishlist" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Beli Barang Wishlist</h3>
+      <button class="modal-close-icon modal-close" data-modal="modal-purchase-wishlist">&times;</button>
+    </div>
+    <form id="form-purchase-wishlist">
+      <input type="hidden" id="purchase-wish-item-id">
+      <div class="modal-body">
+        <p id="purchase-wish-prompt" style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 16px; font-weight: 500;"></p>
+        <div class="form-group">
+          <label class="form-label">Sumber Rekening *</label>
+          <select id="purchase-wish-account" required></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Kategori Pengeluaran *</label>
+          <select id="purchase-wish-category" required></select>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost modal-close" data-modal="modal-purchase-wishlist">Batal</button>
+        <button type="submit" class="btn btn-success" style="background-color: var(--green); border-color: var(--green);">Beli Sekarang</button>
       </div>
     </form>
   </div>
