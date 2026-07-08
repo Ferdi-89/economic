@@ -333,6 +333,10 @@ function renderBarChart() {
   const incomes  = months.map(m => TRANSACTIONS.filter(t => t.type==='income'  && t.date?.startsWith(m)).reduce((s,t)=>s+t.amount,0));
   const expenses = months.map(m => TRANSACTIONS.filter(t => t.type==='expense' && t.date?.startsWith(m)).reduce((s,t)=>s+t.amount,0));
   if (chartBar) chartBar.destroy();
+
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#94a3b8';
+  const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border-strong').trim() || 'rgba(120,120,120,0.1)';
+
   chartBar = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -342,7 +346,15 @@ function renderBarChart() {
         { label:'Pengeluaran',data: expenses, backgroundColor:'rgba(239,68,68,.7)',   borderRadius:4 }
       ]
     },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#94a3b8'}}}, scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#94a3b8',callback:v=>idr(v)},grid:{color:'rgba(255,255,255,.05)'}}}}
+    options: { 
+      responsive:true, 
+      maintainAspectRatio:false, 
+      plugins:{legend:{labels:{color:textColor}}}, 
+      scales:{
+        x:{ticks:{color:textColor},grid:{color:gridColor}},
+        y:{ticks:{color:textColor,callback:v=>idr(v)},grid:{color:gridColor}}
+      }
+    }
   });
 }
 
@@ -360,10 +372,18 @@ function renderPieChart() {
   const values = Object.values(catMap);
   const colors = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#0ea5e9','#14b8a6'];
   if (chartPie) chartPie.destroy();
+
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#94a3b8';
+
   chartPie = new Chart(ctx, {
     type: 'doughnut',
     data: { labels, datasets:[{ data:values, backgroundColor:colors.slice(0,labels.length), borderWidth:0 }] },
-    options: { responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',padding:12}}} }
+    options: { 
+      responsive:true, 
+      maintainAspectRatio:false, 
+      cutout:'60%', 
+      plugins:{legend:{position:'bottom',labels:{color:textColor,padding:12}}} 
+    }
   });
 }
 
