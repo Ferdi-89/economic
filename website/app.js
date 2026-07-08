@@ -141,14 +141,13 @@ async function checkSession() {
       await loadUserProfile();
       hideElement('auth-container');
       showElement('app-container');
-      initApp();
+      await initApp();
     } else {
       currentUser = null;
       currentProfile = null;
       hideElement('app-container');
       showElement('auth-container');
       toggleAuthMode(false); // Default to login
-      hideLoader();
     }
   } catch (err) {
     console.error('Pemeriksaan sesi gagal:', err);
@@ -157,9 +156,12 @@ async function checkSession() {
     hideElement('app-container');
     showElement('auth-container');
     toggleAuthMode(false);
+  } finally {
+    // Always hide loader regardless of success/failure/session state
     hideLoader();
   }
 }
+
 
 async function loadUserProfile() {
   if (!currentUser) return;
