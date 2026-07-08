@@ -135,13 +135,15 @@ function renderDashboard() {
     accEl.innerHTML = '<div class="empty-msg">Belum ada rekening</div>';
   } else {
     accEl.innerHTML = ACCOUNTS.slice(0,5).map(a => `
-      <div class="list-item">
-        <div class="list-icon" style="background:${a.color || '#0ea5e9'}22; font-size:.9rem;">💳</div>
-        <div class="list-main">
-          <div class="list-title">${a.name}</div>
-          <div class="list-sub">${accountTypeLabel(a.account_type)}</div>
+      <div class="mini-item">
+        <div class="mini-icon" style="background:${a.color || '#0ea5e9'}22; font-size:.9rem;">💳</div>
+        <div class="mini-info">
+          <div class="mini-title">${a.name}</div>
+          <div class="mini-sub">${accountTypeLabel(a.account_type)}</div>
         </div>
-        <div class="list-amount">${idr(a.balance)}</div>
+        <div class="mini-right">
+          <div class="mini-amount">${idr(a.balance)}</div>
+        </div>
       </div>`).join('');
   }
 
@@ -168,7 +170,7 @@ function renderTransactions() {
   }
   el.innerHTML = list.map(t => `
     <div class="tx-item">
-      <div class="tx-badge ${t.type}">${typeEmoji(t.type)}</div>
+      <div class="tx-type-badge ${t.type}">${typeEmoji(t.type)}</div>
       <div class="tx-body">
         <div class="tx-note">${t.notes || '–'}</div>
         <div class="tx-meta">${categoryName(t.category_id)} · ${accountName(t.account_id)}</div>
@@ -186,13 +188,15 @@ function renderTransactions() {
 
 function txItemHTML(t) {
   return `
-    <div class="list-item">
-      <div class="list-icon" style="background:${typeColor(t.type)}22">${typeEmoji(t.type)}</div>
-      <div class="list-main">
-        <div class="list-title">${t.notes || categoryName(t.category_id) || '–'}</div>
-        <div class="list-sub">${accountName(t.account_id)} · ${formatDate(t.date)}</div>
+    <div class="mini-item">
+      <div class="mini-icon" style="background:${typeColor(t.type)}22">${typeEmoji(t.type)}</div>
+      <div class="mini-info">
+        <div class="mini-title">${t.notes || categoryName(t.category_id) || '–'}</div>
+        <div class="mini-sub">${accountName(t.account_id)} · ${formatDate(t.date)}</div>
       </div>
-      <div class="list-amount ${t.type}">${t.type === 'income' ? '+' : '-'}${idr(t.amount)}</div>
+      <div class="mini-right">
+        <div class="mini-amount ${t.type}">${t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}${idr(t.amount)}</div>
+      </div>
     </div>`;
 }
 
@@ -235,20 +239,27 @@ function renderBudgets() {
     const over     = spent > b.monthly_limit;
     const catNames = itemIds.map(id => categoryName(id)).filter(Boolean);
     return `
-      <div class="budget-card" style="--bud-color:${b.color || '#10b981'}">
-        <div class="bud-head">
-          <span class="bud-name">${b.name}</span>
-          <div class="bud-actions">
-            <button class="btn-icon" onclick="deleteBudget('${b.id}')" title="Hapus">🗑️</button>
+      <div class="budget-card" style="--bud-accent:${b.color || '#10b981'}">
+        <div class="bud-header">
+          <div class="bud-name-wrap">
+            <span class="bud-name">${b.name}</span>
+            <span class="bud-period">Bulan Ini</span>
           </div>
+          <button class="btn-icon" onclick="deleteBudget('${b.id}')" title="Hapus">🗑️</button>
         </div>
-        <div class="bud-amounts">
-          <span>Terpakai: <strong style="color:${over?'var(--expense)':'inherit'}">${idr(spent)}</strong></span>
-          <span>Limit: <strong>${idr(b.monthly_limit)}</strong></span>
+        <div class="bud-numbers">
+          <span class="bud-spent" style="color:${over?'var(--red)':'inherit'}">${idr(spent)}</span>
+          <span class="bud-of">dari</span>
+          <span class="bud-limit">${idr(b.monthly_limit)}</span>
         </div>
-        <div class="progress-bar"><div class="progress-fill${over?' over':''}" style="width:${pct}%"></div></div>
-        <div class="bud-percent">${pct}% terpakai${over?' — Melebihi anggaran! ⚠️':''}</div>
-        ${catNames.length ? `<div class="bud-cats">${catNames.map(n=>`<span class="bud-cat-tag">${n}</span>`).join('')}</div>` : ''}
+        <div class="progress-track">
+          <div class="progress-bar${over?' over':''}" style="width:${pct}%"></div>
+        </div>
+        <div class="bud-meta">
+          <span class="bud-pct${over?' over':''}">${pct}% terpakai</span>
+          <span>${over ? 'Melebihi Limit! ⚠️' : 'Aman'}</span>
+        </div>
+        ${catNames.length ? `<div class="bud-tags">${catNames.map(n=>`<span class="bud-tag">${n}</span>`).join('')}</div>` : ''}
       </div>`;
   }).join('');
 }
@@ -257,6 +268,62 @@ function renderBudgets() {
 function renderReports() {
   renderBarChart();
   renderPieChart();
+  renderSummaryStats();
+}
+
+function renderSummaryStats() {
+  const now = monthNow();
+  const monthTx = TRANSACTIONS.filter(t => t.date?.startsWith(now));
+  
+  const income  = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
+  const expense = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+  const netSavings = income - expense;
+  
+  // 1. Savings Rate
+  const savingsRate = income > 0 ? Math.round((netSavings / income) * 100) : 0;
+  const savingsRateEl = $('report-savings-rate');
+  if (savingsRateEl) {
+    savingsRateEl.textContent = `${savingsRate}%`;
+    savingsRateEl.style.color = netSavings >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+  const savingsValEl = $('report-savings-value');
+  if (savingsValEl) {
+    savingsValEl.textContent = `Bersih: ${idr(netSavings)}`;
+  }
+  
+  // 2. Average Expense
+  const expenses = monthTx.filter(t => t.type === 'expense');
+  const avgExpense = expenses.length > 0 ? Math.round(expense / expenses.length) : 0;
+  const avgExpenseEl = $('report-avg-expense');
+  if (avgExpenseEl) {
+    avgExpenseEl.textContent = idr(avgExpense);
+  }
+  const avgSubEl = $('report-avg-sub');
+  if (avgSubEl) {
+    avgSubEl.textContent = `${expenses.length} transaksi bulan ini`;
+  }
+  
+  // 3. Top Category
+  const catMap = {};
+  expenses.forEach(t => {
+    catMap[t.category_id] = (catMap[t.category_id] || 0) + t.amount;
+  });
+  let topCatId = null;
+  let topCatVal = 0;
+  for (const cid in catMap) {
+    if (catMap[cid] > topCatVal) {
+      topCatVal = catMap[cid];
+      topCatId = cid;
+    }
+  }
+  const topCatEl = $('report-top-category');
+  if (topCatEl) {
+    topCatEl.textContent = topCatId ? categoryName(topCatId) : '–';
+  }
+  const topCatValEl = $('report-top-category-value');
+  if (topCatValEl) {
+    topCatValEl.textContent = topCatId ? `Total: ${idr(topCatVal)}` : 'Belum ada pengeluaran';
+  }
 }
 
 function renderBarChart() {
@@ -564,7 +631,7 @@ function toggleAuthMode(signUp) {
   $('auth-title').textContent    = signUp ? 'Buat Akun Baru' : 'Masuk ke Akun';
   $('auth-subtitle').textContent = signUp ? 'Mulai kelola keuangan Anda hari ini' : 'Kelola keuangan Anda secara realtime';
   $('auth-btn-text').textContent = signUp ? 'Daftar' : 'Masuk';
-  $('auth-switch-text').textContent = signUp ? 'Sudah punya akun?' : 'Belum punya akun?';
+  $('auth-switch-label').textContent = signUp ? 'Sudah punya akun?' : 'Belum punya akun?';
   $('auth-switch-btn').textContent  = signUp ? 'Masuk sekarang' : 'Daftar sekarang';
   signUp ? show('name-field') : hide('name-field');
   hide('auth-error');
@@ -572,9 +639,12 @@ function toggleAuthMode(signUp) {
 
 $('auth-switch-btn').addEventListener('click', () => toggleAuthMode(!isSignUp));
 
-$('btn-toggle-pw').addEventListener('click', () => {
+$('btn-pw-toggle').addEventListener('click', () => {
   const inp = $('input-password');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+  const isPw = inp.type === 'password';
+  inp.type = isPw ? 'text' : 'password';
+  $('eye-off').classList.toggle('hidden', !isPw);
+  $('eye-on').classList.toggle('hidden', isPw);
 });
 
 $('auth-form').addEventListener('submit', async e => {
@@ -665,7 +735,7 @@ function openQuickMenu() {
 }
 $('btn-add').addEventListener('click', openQuickMenu);
 $('mobile-add').addEventListener('click', e => { e.preventDefault(); openQuickMenu(); });
-$('quick-menu').querySelector('.quick-menu-backdrop').addEventListener('click', () => hide('quick-menu'));
+$('quick-menu').querySelector('.quick-backdrop').addEventListener('click', () => hide('quick-menu'));
 
 document.querySelectorAll('.quick-item').forEach(btn => {
   btn.addEventListener('click', () => {
