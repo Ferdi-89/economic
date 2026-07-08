@@ -1,6 +1,48 @@
 // ════════ FINANCIER APP JAVASCRIPT ════════
 
-// 1. Supabase Initialization
+// 0. Global Error Logger for Debugging
+window.onerror = function(message, source, lineno, colno, error) {
+  console.error("Global Error Caught:", message, "at", source, ":", lineno);
+  
+  // Create a visible error message box on top of the page
+  const errorBox = document.createElement('div');
+  errorBox.id = 'debug-error-box';
+  errorBox.style.position = 'fixed';
+  errorBox.style.inset = '20px';
+  errorBox.style.background = '#1a1a24';
+  errorBox.style.border = '2px solid #ef4444';
+  errorBox.style.color = '#fca5a5';
+  errorBox.style.padding = '24px';
+  errorBox.style.borderRadius = '16px';
+  errorBox.style.zIndex = '999999';
+  errorBox.style.fontFamily = 'monospace';
+  errorBox.style.fontSize = '14px';
+  errorBox.style.overflow = 'auto';
+  errorBox.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.5)';
+  
+  errorBox.innerHTML = `
+    <h3 style="color: #ef4444; margin-bottom: 12px; font-weight: bold;">Aplikasi Crash (Error terdeteksi)</h3>
+    <p style="margin-bottom: 8px;"><strong>Pesan:</strong> ${message}</p>
+    <p style="margin-bottom: 8px;"><strong>Lokasi:</strong> ${source}:${lineno}:${colno}</p>
+    <pre style="background: #09090b; padding: 12px; border-radius: 8px; color: #a1a1aa; margin-top: 12px; white-space: pre-wrap; font-size: 12px;">${error ? error.stack : 'No stack trace available'}</pre>
+    <button onclick="document.getElementById('debug-error-box').remove()" style="margin-top: 16px; padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Tutup</button>
+  `;
+  
+  document.body.appendChild(errorBox);
+  
+  // Force hide the loader so the error box is visible
+  const loader = document.getElementById('global-loader');
+  if (loader) loader.classList.add('hidden');
+  
+  return false;
+};
+
+// 1. Verify Library Load
+if (!window.supabase) {
+  throw new Error("Supabase library (supabase-js) gagal dimuat dari CDN. Silakan periksa koneksi internet Anda atau adblocker.");
+}
+
+// 2. Supabase Initialization
 const SUPABASE_URL = 'https://mgyohqvbcpripmkgipvs.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_p0NuPgDrOUq8quIw1PFflg__T3UXHhz';
 
@@ -91,20 +133,30 @@ function updateThemeIcons(theme) {
 // 5. Auth Functions
 async function checkSession() {
   showLoader();
-  const { data: { session }, error } = await supabase.auth.getSession();
-  
-  if (session && session.user) {
-    currentUser = session.user;
-    await loadUserProfile();
-    hideElement('auth-container');
-    showElement('app-container');
-    initApp();
-  } else {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (session && session.user) {
+      currentUser = session.user;
+      await loadUserProfile();
+      hideElement('auth-container');
+      showElement('app-container');
+      initApp();
+    } else {
+      currentUser = null;
+      currentProfile = null;
+      hideElement('app-container');
+      showElement('auth-container');
+      toggleAuthMode(false); // Default to login
+      hideLoader();
+    }
+  } catch (err) {
+    console.error('Pemeriksaan sesi gagal:', err);
     currentUser = null;
     currentProfile = null;
     hideElement('app-container');
     showElement('auth-container');
-    toggleAuthMode(false); // Default to login
+    toggleAuthMode(false);
     hideLoader();
   }
 }
