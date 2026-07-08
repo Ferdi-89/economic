@@ -385,12 +385,7 @@ function populateSelects() {
   $('tx-to-account').innerHTML = '<option value="">Pilih tujuan</option>' + accOpts;
   $('filter-account') && ($('filter-account').innerHTML = '<option value="">Semua Rekening</option>' + accOpts);
 
-  // Category select
-  const expCats = CATEGORIES.filter(c => c.type === 'expense' || c.type === 'both');
-  const incCats = CATEGORIES.filter(c => c.type === 'income'  || c.type === 'both');
-  const allCats = CATEGORIES;
-  $('tx-category').innerHTML = '<option value="">Pilih kategori</option>' +
-    allCats.map(c => `<option value="${c.id}" data-type="${c.type}">${c.name}</option>`).join('');
+  // tx-category will be populated dynamically inside setTxType() to ensure cross-browser compatibility
 
   // Budget category checkboxes
   const budCats = $('bud-cats');
@@ -425,8 +420,8 @@ function openTxModal(type = 'expense') {
   $('tx-edit-id').value = '';
   $('form-tx').reset();
   $('tx-date').value = today();
-  setTxType(type);
   populateSelects();
+  setTxType(type);
   openModal('modal-tx');
 }
 
@@ -437,12 +432,17 @@ function setTxType(type) {
   });
   $('tx-to-field').style.display  = type === 'transfer' ? '' : 'none';
   $('tx-cat-field').style.display = type === 'transfer' ? 'none' : '';
-  // Filter categories by type
-  Array.from($('tx-category').options).forEach(o => {
-    if (!o.value) return;
-    const catType = o.dataset.type || '';
-    o.style.display = (catType === type || catType === 'both' || (type === 'income' && catType === 'income') || (type === 'expense' && catType === 'expense')) ? '' : 'none';
-  });
+  
+  // Rebuild category options dynamically (works 100% on Safari, Chrome, and Mobile browsers)
+  const filteredCats = CATEGORIES.filter(c => 
+    c.type === 'both' || 
+    c.type === type || 
+    (type === 'income' && c.type === 'income') || 
+    (type === 'expense' && c.type === 'expense')
+  );
+  
+  $('tx-category').innerHTML = '<option value="">Pilih kategori…</option>' +
+    filteredCats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 }
 
 $('form-tx').addEventListener('submit', async e => {
@@ -547,7 +547,7 @@ $('form-account').addEventListener('submit', async e => {
   showLoader();
   try {
     if (editId) {
-      await sb.from('accounts').update({ name, account_type: type, bank_name: bank, account_number: number, color }).eq('id', editId);
+      await sb.from('accounts').update({ name, account_type: type, balance, bank_name: bank, account_number: number, color }).eq('id', editId);
     } else {
       await sb.from('accounts').insert({ user_id: USER.id, name, account_type: type, balance, bank_name: bank, account_number: number, color, is_active: true });
     }
