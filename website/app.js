@@ -170,7 +170,7 @@ function renderDashboard() {
         </div>
         <div class="mini-info">
           <div class="mini-title">${a.name}</div>
-          <div class="mini-sub">${accountTypeLabel(a.account_type)}</div>
+          <div class="mini-sub">${accountTypeLabel(a.type)}</div>
         </div>
         <div class="mini-right">
           <div class="mini-amount">${idr(a.balance)}</div>
@@ -287,7 +287,7 @@ function renderAccounts() {
   }
   el.innerHTML = ACCOUNTS.map(a => `
     <div class="account-card" style="--card-color:${a.color || '#0ea5e9'}">
-      <div class="acc-type-label">${accountTypeLabel(a.account_type)}</div>
+      <div class="acc-type-label">${accountTypeLabel(a.type)}</div>
       <div class="acc-name">${a.name}</div>
       <div class="acc-balance">${idr(a.balance)}</div>
       <div class="acc-footer">
@@ -683,9 +683,9 @@ $('form-account').addEventListener('submit', async e => {
   showLoader();
   try {
     if (editId) {
-      await sb.from('accounts').update({ name, account_type: type, balance, bank_name: bank, account_number: number, color }).eq('id', editId);
+      await sb.from('accounts').update({ name, type, balance, bank_name: bank, account_number: number, color }).eq('id', editId);
     } else {
-      await sb.from('accounts').insert({ user_id: USER.id, name, account_type: type, balance, bank_name: bank, account_number: number, color, is_active: true });
+      await sb.from('accounts').insert({ user_id: USER.id, name, type, balance, bank_name: bank, account_number: number, color, is_active: true });
     }
     closeModal('modal-account');
     await loadAll(); renderAll();
@@ -698,7 +698,7 @@ async function editAccount(id) {
   if (!a) return;
   $('acc-edit-id').value = id;
   $('acc-name').value    = a.name;
-  $('acc-type').value    = a.account_type;
+  $('acc-type').value    = a.type;
   $('acc-balance').value = a.balance;
   $('acc-bank').value    = a.bank_name || '';
   $('acc-number').value  = a.account_number || '';
