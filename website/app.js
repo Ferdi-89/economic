@@ -37,16 +37,31 @@ window.onerror = function(message, source, lineno, colno, error) {
   return false;
 };
 
-// 1. Verify Library Load
-if (!window.supabase) {
-  throw new Error("Supabase library (supabase-js) gagal dimuat dari CDN. Silakan periksa koneksi internet Anda atau adblocker.");
-}
+// 0b. Global Unhandled Promise Rejection Catcher
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('Unhandled Promise Rejection:', event.reason);
+  const loader = document.getElementById('global-loader');
+  if (loader) loader.classList.add('hidden');
+  const authContainer = document.getElementById('auth-container');
+  if (authContainer) authContainer.classList.remove('hidden');
+});
 
-// 2. Supabase Initialization
+// 1. Supabase Initialization (done at top-level so supabase is available globally)
 const SUPABASE_URL = 'https://mgyohqvbcpripmkgipvs.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_p0NuPgDrOUq8quIw1PFflg__T3UXHhz';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabase;
+try {
+  if (!window.supabase) throw new Error('Supabase CDN tidak termuat. Periksa koneksi atau adblocker.');
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch(e) {
+  // Show error immediately even if DOM is not ready
+  document.addEventListener('DOMContentLoaded', () => {
+    const loader = document.getElementById('global-loader');
+    if (loader) loader.classList.add('hidden');
+    alert('Error inisialisasi: ' + e.message);
+  });
+}
 
 // 2. Global State Variables
 let currentUser = null;
@@ -134,8 +149,16 @@ function updateThemeIcons(theme) {
 async function checkSession() {
   showLoader();
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
+    // Race between getSession and an 8 second timeout
+    const sessionResult = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT: Koneksi ke server Supabase terlalu lama (>8 detik)')), 8000)
+      )
+    ]);
+
+    const { data: { session }, error } = sessionResult;
+
     if (session && session.user) {
       currentUser = session.user;
       await loadUserProfile();
@@ -147,7 +170,7 @@ async function checkSession() {
       currentProfile = null;
       hideElement('app-container');
       showElement('auth-container');
-      toggleAuthMode(false); // Default to login
+      toggleAuthMode(false);
     }
   } catch (err) {
     console.error('Pemeriksaan sesi gagal:', err);
@@ -157,7 +180,6 @@ async function checkSession() {
     showElement('auth-container');
     toggleAuthMode(false);
   } finally {
-    // Always hide loader regardless of success/failure/session state
     hideLoader();
   }
 }
@@ -1443,7 +1465,15 @@ async function handleLogout() {
 
 // 15. Safe Bootstrapping
 function bootstrap() {
-  console.log("Bootstrapping Financier Web App...");
+  console.log("Bootstrapping Financier Web App v1.0.4...");
+  if (!supabase) {
+    // Supabase failed to initialize - show auth container with error
+    const loader = document.getElementById('global-loader');
+    if (loader) loader.classList.add('hidden');
+    const authContainer = document.getElementById('auth-container');
+    if (authContainer) authContainer.classList.remove('hidden');
+    return;
+  }
   initTheme();
   
   // Theme Toggle Button Listeners
