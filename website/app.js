@@ -244,7 +244,7 @@ function renderDashboard() {
 function renderTransactions() {
   let list = [...TRANSACTIONS];
   if (txFilter.q) {
-    list = list.filter(t => (t.notes || '').toLowerCase().includes(txFilter.q.toLowerCase()));
+    list = list.filter(t => (t.note || '').toLowerCase().includes(txFilter.q.toLowerCase()));
   }
   if (txFilter.type) {
     list = list.filter(t => t.type === txFilter.type);
@@ -282,7 +282,7 @@ function renderTransactions() {
       <div class="tx-item">
         <div class="tx-type-badge ${t.type}">${typeIcon(t.type)}</div>
         <div class="tx-body">
-          <div class="tx-note">${t.notes || (isTransfer ? 'Transfer Uang' : 'Tanpa Catatan')}</div>
+          <div class="tx-note">${t.note || (isTransfer ? 'Transfer Uang' : 'Tanpa Catatan')}</div>
           <div class="tx-meta">${metaDetails}</div>
         </div>
         <div class="tx-right">
@@ -313,7 +313,7 @@ function txItemHTML(t) {
     ? `${accountName(t.account_id)} → ${accountName(t.transfer_to_account_id)}`
     : accountName(t.account_id);
     
-  const title = t.notes || (isTransfer ? 'Transfer Uang' : categoryName(t.category_id) || '–');
+  const title = t.note || (isTransfer ? 'Transfer Uang' : categoryName(t.category_id) || '–');
   const subtitle = isTransfer 
     ? accountInfo
     : `${accountInfo} · ${formatDate(t.date)}`;
@@ -644,7 +644,8 @@ $('form-tx').addEventListener('submit', async e => {
   try {
     if (editId) {
       const oldTx = TRANSACTIONS.find(t => t.id === editId);
-      await sb.from('transactions').update({ type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, notes }).eq('id', editId);
+      const { error: txError } = await sb.from('transactions').update({ type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, note: notes }).eq('id', editId);
+      if (txError) throw txError;
       
       if (oldTx) {
         // 1. Revert old transaction effect on account balances
@@ -652,14 +653,16 @@ $('form-tx').addEventListener('submit', async e => {
         if (oldAcc) {
           let revDelta = oldTx.type === 'income' ? -oldTx.amount : oldTx.amount;
           let newBal = (oldAcc.balance || 0) + revDelta;
-          await sb.from('accounts').update({ balance: newBal }).eq('id', oldTx.account_id);
+          const { error: accErr1 } = await sb.from('accounts').update({ balance: newBal }).eq('id', oldTx.account_id);
+          if (accErr1) throw accErr1;
           oldAcc.balance = newBal; // Temporarily update local reference
         }
         if (oldTx.type === 'transfer' && oldTx.transfer_to_account_id) {
           const oldToAcc = ACCOUNTS.find(a => a.id === oldTx.transfer_to_account_id);
           if (oldToAcc) {
             let newBal = (oldToAcc.balance || 0) - oldTx.amount;
-            await sb.from('accounts').update({ balance: newBal }).eq('id', oldTx.transfer_to_account_id);
+            const { error: accErr2 } = await sb.from('accounts').update({ balance: newBal }).eq('id', oldTx.transfer_to_account_id);
+            if (accErr2) throw accErr2;
             oldToAcc.balance = newBal;
           }
         }
@@ -671,25 +674,32 @@ $('form-tx').addEventListener('submit', async e => {
         const newAcc = ACCOUNTS.find(a => a.id === accountId);
         if (newAcc) {
           let newDelta = type === 'income' ? amount : -amount;
-          await sb.from('accounts').update({ balance: (newAcc.balance || 0) + newDelta }).eq('id', accountId);
+          const { error: accErr3 } = await sb.from('accounts').update({ balance: (newAcc.balance || 0) + newDelta }).eq('id', accountId);
+          if (accErr3) throw accErr3;
         }
         if (type === 'transfer' && toAccId) {
           const newToAcc = ACCOUNTS.find(a => a.id === toAccId);
           if (newToAcc) {
-            await sb.from('accounts').update({ balance: (newToAcc.balance || 0) + amount }).eq('id', toAccId);
+            const { error: accErr4 } = await sb.from('accounts').update({ balance: (newToAcc.balance || 0) + amount }).eq('id', toAccId);
+            if (accErr4) throw accErr4;
           }
         }
       }
     } else {
-      await sb.from('transactions').insert({ user_id: USER.id, type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, notes });
+      const { error: txError } = await sb.from('transactions').insert({ user_id: USER.id, type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, note: notes });
+      if (txError) throw txError;
       // Update balance
       const account = ACCOUNTS.find(a => a.id === accountId);
       if (account) {
         const delta = type === 'income' ? amount : -amount;
-        await sb.from('accounts').update({ balance: (account.balance || 0) + delta }).eq('id', accountId);
+        const { error: accErr5 } = await sb.from('accounts').update({ balance: (account.balance || 0) + delta }).eq('id', accountId);
+        if (accErr5) throw accErr5;
         if (type === 'transfer' && toAccId) {
           const toAcc = ACCOUNTS.find(a => a.id === toAccId);
-          if (toAcc) await sb.from('accounts').update({ balance: (toAcc.balance || 0) + amount }).eq('id', toAccId);
+          if (toAcc) {
+            const { error: accErr6 } = await sb.from('accounts').update({ balance: (toAcc.balance || 0) + amount }).eq('id', toAccId);
+            if (accErr6) throw accErr6;
+          }
         }
       }
     }
@@ -709,7 +719,7 @@ async function editTx(id) {
   $('tx-edit-id').value = id;
   $('tx-amount').value  = t.amount;
   $('tx-date').value    = t.date;
-  $('tx-note').value    = t.notes || '';
+  $('tx-note').value    = t.note || '';
   populateSelects();
   setTxType(t.type);
   $('tx-account').value    = t.account_id || '';
@@ -1548,7 +1558,7 @@ if (btnExportCsv) {
       const catStr = categoryName(t.category_id).replace(/,/g, '');
       const accStr = accountName(t.account_id).replace(/,/g, '');
       const amtStr = t.amount || 0;
-      const noteStr = (t.notes || '').replace(/,/g, '');
+      const noteStr = (t.note || '').replace(/,/g, '');
       
       csvContent += `${dateStr},${typeStr},${catStr},${accStr},${amtStr},${noteStr}\n`;
     });
