@@ -50,6 +50,7 @@ sb.auth.onAuthStateChange((_event, session) => {
 
 // ── Show auth / app ──
 function showAuthScreen() {
+  unsubscribeWishlistRealtime();
   hideLoader();
   hide('app');
   show('auth-screen');
@@ -61,6 +62,7 @@ async function showApp() {
   show('app');
   updateUserUI();
   await loadAll();
+  subscribeWishlistRealtime();
   hideLoader();
   renderAll();
   if (window.lucide) lucide.createIcons();
@@ -73,6 +75,25 @@ function updateUserUI() {
   $('sidebar-avatar').textContent = init;
   $('sidebar-name').textContent   = name;
   $('sidebar-email').textContent  = email;
+}
+
+let wishlistSubscription = null;
+
+function subscribeWishlistRealtime() {
+  if (!USER || wishlistSubscription) return;
+  wishlistSubscription = sb.channel('public-wishlist')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'wishlist', filter: `user_id=eq.${USER.id}` }, async () => {
+      await fetchWishlist();
+      renderAll();
+    })
+    .subscribe();
+}
+
+function unsubscribeWishlistRealtime() {
+  if (wishlistSubscription) {
+    sb.removeChannel(wishlistSubscription);
+    wishlistSubscription = null;
+  }
 }
 
 // ── Data loading ──
@@ -1118,6 +1139,18 @@ function initWishlist() {
       openModal('modal-wishlist');
     });
   }
+
+  const btnRefresh = $('btn-refresh-wishlist');
+  if (btnRefresh) {
+    const newBtnRefresh = btnRefresh.cloneNode(true);
+    btnRefresh.parentNode.replaceChild(newBtnRefresh, btnRefresh);
+    newBtnRefresh.addEventListener('click', async () => {
+      showLoader();
+      await fetchWishlist();
+      renderAll();
+      hideLoader();
+    });
+  }
 }
 
 function saveWishlistLocal() {
@@ -1142,19 +1175,24 @@ async function deleteWishlistItem(id) {
 async function toggleWishlistItem(id) {
   const item = WISHLIST.find(i => i.id === id);
   if (!item) return;
+  const originalState = item.isEnabled;
   const nextState = !item.isEnabled;
   
-  showLoader();
+  // Optimistic UI update
+  item.isEnabled = nextState;
+  saveWishlistLocal();
+  renderAll();
+  
   try {
     const { error } = await sb.from('wishlist').update({ is_enabled: nextState }).eq('id', id);
     if (error) throw error;
   } catch (err) {
-    console.warn('Gagal memperbarui database, melakukan pembaruan lokal:', err.message);
+    console.warn('Gagal memperbarui database, memulihkan status:', err.message);
+    item.isEnabled = originalState;
+    saveWishlistLocal();
+    renderAll();
+    alert('Gagal menyimpan perubahan ke server: ' + err.message);
   }
-  item.isEnabled = nextState;
-  saveWishlistLocal();
-  renderAll();
-  hideLoader();
 }
 
 function renderWishlist() {
@@ -1289,18 +1327,20 @@ function renderBills() {
 async function toggleBillStatus(id) {
   const b = BILLS.find(item => item.id === id);
   if (!b) return;
+  const originalStatus = b.status;
   const nextStatus = b.status === 'paid' ? 'pending' : 'paid';
   
-  showLoader();
+  // Optimistic UI update
+  b.status = nextStatus;
+  renderAll();
+  
   try {
     const { error } = await sb.from('bills').update({ status: nextStatus }).eq('id', id);
     if (error) throw error;
-    b.status = nextStatus;
-    renderAll();
   } catch (err) {
-    alert('Gagal memperbarui tagihan: ' + err.message);
-  } finally {
-    hideLoader();
+    b.status = originalStatus;
+    renderAll();
+    alert('Gagal memperbarui tagihan di server: ' + err.message);
   }
 }
 
@@ -1433,18 +1473,20 @@ function renderDebts() {
 async function toggleDebtStatus(id) {
   const d = DEBTS.find(item => item.id === id);
   if (!d) return;
+  const originalStatus = d.status;
   const nextStatus = d.status === 'paid' ? 'unpaid' : 'paid';
   
-  showLoader();
+  // Optimistic UI update
+  d.status = nextStatus;
+  renderAll();
+  
   try {
     const { error } = await sb.from('debts').update({ status: nextStatus }).eq('id', id);
     if (error) throw error;
-    d.status = nextStatus;
-    renderAll();
   } catch (err) {
-    alert('Gagal memperbarui status: ' + err.message);
-  } finally {
-    hideLoader();
+    d.status = originalStatus;
+    renderAll();
+    alert('Gagal memperbarui status di server: ' + err.message);
   }
 }
 
