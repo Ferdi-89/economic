@@ -76,9 +76,22 @@ function updateUserUI() {
 }
 
 // ── Data loading ──
+let BILLS = [];
+let SAVING_GOALS = [];
+let DEBTS = [];
+
 async function loadAll() {
   try {
-    await Promise.all([fetchAccounts(), fetchCategories(), fetchTransactions(), fetchBudgets(), fetchWishlist()]);
+    await Promise.all([
+      fetchAccounts(),
+      fetchCategories(),
+      fetchTransactions(),
+      fetchBudgets(),
+      fetchWishlist(),
+      fetchBills(),
+      fetchSavingGoals(),
+      fetchDebts()
+    ]);
   } catch (e) {
     console.error('loadAll error:', e);
   }
@@ -125,6 +138,39 @@ async function fetchWishlist() {
   }
 }
 
+async function fetchBills() {
+  try {
+    const { data, error } = await sb.from('bills').select('*').eq('user_id', USER.id).order('due_date');
+    if (error) throw error;
+    BILLS = data || [];
+  } catch (e) {
+    console.warn('Gagal memuat tagihan dari database:', e.message);
+    BILLS = [];
+  }
+}
+
+async function fetchSavingGoals() {
+  try {
+    const { data, error } = await sb.from('saving_goals').select('*').eq('user_id', USER.id).order('created_at');
+    if (error) throw error;
+    SAVING_GOALS = data || [];
+  } catch (e) {
+    console.warn('Gagal memuat target tabungan dari database:', e.message);
+    SAVING_GOALS = [];
+  }
+}
+
+async function fetchDebts() {
+  try {
+    const { data, error } = await sb.from('debts').select('*').eq('user_id', USER.id).order('created_at');
+    if (error) throw error;
+    DEBTS = data || [];
+  } catch (e) {
+    console.warn('Gagal memuat hutang/piutang dari database:', e.message);
+    DEBTS = [];
+  }
+}
+
 // ── Render all ──
 function renderAll() {
   renderDashboard();
@@ -133,12 +179,19 @@ function renderAll() {
   renderBudgets();
   renderReports();
   renderWishlist();
+  renderBills();
+  renderSavingGoals();
+  renderDebts();
   populateSelects();
 }
 
 // ── Dashboard ──
 function renderDashboard() {
   const totalBalance = ACCOUNTS.reduce((s, a) => s + (a.balance || 0), 0);
+  const totalLoans = DEBTS.filter(d => d.type === 'loan' && d.status === 'unpaid').reduce((s, d) => s + (d.amount || 0), 0);
+  const totalDebts = DEBTS.filter(d => d.type === 'debt' && d.status === 'unpaid').reduce((s, d) => s + (d.amount || 0), 0);
+  const netWorth = totalBalance + totalLoans - totalDebts;
+
   const now = monthNow();
   const monthTx = TRANSACTIONS.filter(t => t.date?.startsWith(now));
   const income   = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
@@ -148,11 +201,11 @@ function renderDashboard() {
   const totalSimulated = WISHLIST.filter(item => item.isEnabled).reduce((s, item) => s + (item.price || 0), 0);
   
   if (wishlistSimulationActive) {
-    $('stat-balance').textContent = idr(totalBalance - totalSimulated);
-    $('stat-accounts-count').innerHTML = `<span style="color:var(--amber); font-weight:600;">Mode Simulasi Aktif</span> (Asli: ${idr(totalBalance)})`;
+    $('stat-balance').textContent = idr(netWorth - totalSimulated);
+    $('stat-accounts-count').innerHTML = `<span style="color:var(--amber); font-weight:600;">Mode Simulasi Aktif</span> (Asli NW: ${idr(netWorth)})`;
   } else {
-    $('stat-balance').textContent = idr(totalBalance);
-    $('stat-accounts-count').textContent = `${ACCOUNTS.length} rekening aktif`;
+    $('stat-balance').textContent = idr(netWorth);
+    $('stat-accounts-count').innerHTML = `Aset: <span style="font-weight:650">${idr(totalBalance)}</span> · Hutang: <span style="color:var(--red); font-weight:650">${idr(totalDebts)}</span> · Piutang: <span style="color:var(--green); font-weight:650">${idr(totalLoans)}</span>`;
   }
 
   $('stat-income').textContent  = idr(income);
@@ -403,6 +456,32 @@ function renderSummaryStats() {
   const topCatValEl = $('report-top-category-value');
   if (topCatValEl) {
     topCatValEl.textContent = topCatId ? `Total: ${idr(topCatVal)}` : 'Belum ada pengeluaran';
+  }
+
+  // 4. Daily / Weekly Averages
+  const currentDay = new Date().getDate();
+  const dailyAvg = expense / (currentDay || 1);
+  const weeklyAvg = expense / 4;
+  const dailyWeeklyEl = $('report-avg-daily-weekly');
+  if (dailyWeeklyEl) {
+    dailyWeeklyEl.textContent = `${idr(dailyAvg)} / ${idr(weeklyAvg)}`;
+  }
+
+  // 5. Month-over-Month (MoM) Comparison
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  const lastMonthStr = d.toISOString().slice(0, 7);
+  const lastMonthExpense = TRANSACTIONS.filter(t => t.type === 'expense' && t.date?.startsWith(lastMonthStr)).reduce((s, t) => s + (t.amount || 0), 0);
+  
+  const momPct = lastMonthExpense > 0 ? Math.round(((expense - lastMonthExpense) / lastMonthExpense) * 100) : 0;
+  const momValEl = $('report-mom-value');
+  if (momValEl) {
+    momValEl.textContent = (momPct > 0 ? '+' : '') + momPct + '%';
+    momValEl.style.color = momPct > 0 ? 'var(--red)' : (momPct < 0 ? 'var(--green)' : 'var(--text-primary)');
+  }
+  const momSubEl = $('report-mom-sub');
+  if (momSubEl) {
+    momSubEl.textContent = `Bulan lalu: ${idr(lastMonthExpense)}`;
   }
 }
 
@@ -1125,6 +1204,365 @@ function renderWishlist() {
 // Bind to window to allow inline html event calls
 window.toggleWishlistItem = toggleWishlistItem;
 window.deleteWishlistItem = deleteWishlistItem;
+window.toggleBillStatus = toggleBillStatus;
+window.deleteBill = deleteBill;
+window.addMoneyToGoal = addMoneyToGoal;
+window.deleteSavingGoal = deleteSavingGoal;
+window.toggleDebtStatus = toggleDebtStatus;
+window.deleteDebt = deleteDebt;
+
+// ── Auto-Categorization ──
+const txNoteInput = $('tx-note');
+if (txNoteInput) {
+  txNoteInput.addEventListener('input', e => {
+    const note = e.target.value.toLowerCase();
+    const type = document.querySelector('.seg-tab.active')?.dataset.type || 'expense';
+    if (type === 'transfer') return;
+    
+    const rules = [
+      { keywords: ['makan', 'minum', 'kopi', 'starbucks', 'warung', 'restoran', 'gojek', 'grab', 'gofood', 'grabfood', 'kuliner', 'food'], cat: 'Makanan & Minuman' },
+      { keywords: ['bensin', 'parkir', 'tol', 'gojek', 'grab', 'mrt', 'lrt', 'krl', 'ojek', 'transport', 'taxi', 'taksi'], cat: 'Transportasi' },
+      { keywords: ['nonton', 'netflix', 'spotify', 'bioskop', 'game', 'gaming', 'steam', 'hiburan', 'liburan', 'travel', 'tiket'], cat: 'Hiburan' },
+      { keywords: ['skincare', 'sabun', 'shampoo', 'dokter', 'obat', 'apotek', 'sakit', 'klinik', 'kesehatan', 'gigi'], cat: 'Kesehatan & Perawatan' },
+      { keywords: ['listrik', 'air', 'pdam', 'internet', 'wifi', 'pulsa', 'kuota', 'tagihan', 'bpjs'], cat: 'Tagihan & Utilitas' },
+      { keywords: ['gaji', 'bonus', 'sampingan', 'deviden', 'investasi', 'bunga', 'income'], cat: 'Gaji' },
+      { keywords: ['belanja', 'tokopedia', 'shopee', 'lazada', 'baju', 'kaos', 'sepatu', 'mall', 'supermarket'], cat: 'Belanja' }
+    ];
+    
+    for (const rule of rules) {
+      if (rule.keywords.some(kw => note.includes(kw))) {
+        const matchedCat = CATEGORIES.find(c => c.name.toLowerCase().includes(rule.cat.toLowerCase()) || rule.cat.toLowerCase().includes(c.name.toLowerCase()));
+        if (matchedCat) {
+          const select = $('tx-category');
+          if (select) select.value = matchedCat.id;
+          break;
+        }
+      }
+    }
+  });
+}
+
+// ── Bills CRUD ──
+function renderBills() {
+  const listEl = $('bills-list');
+  if (!listEl) return;
+  if (!BILLS.length) {
+    listEl.innerHTML = '<div class="empty-msg">Belum ada tagihan terdaftar</div>';
+    return;
+  }
+  listEl.innerHTML = BILLS.map(b => {
+    const isPaid = b.status === 'paid';
+    const isChecked = isPaid ? 'checked' : '';
+    const nameStyle = isPaid ? 'text-decoration: line-through; color: var(--text-muted);' : '';
+    const dueColor = isPaid ? 'var(--text-muted)' : (new Date(b.due_date) < new Date() ? 'var(--red)' : 'var(--text-secondary)');
+    
+    return `
+      <div class="mini-item" style="padding: 12px 16px; align-items: center;">
+        <input type="checkbox" ${isChecked} onchange="toggleBillStatus('${b.id}')" style="width: 16px; height: 16px; accent-color: var(--text-primary); cursor: pointer; margin-right: 8px;">
+        <div class="mini-info" style="margin-left: 0;">
+          <div class="mini-title" style="${nameStyle}">${b.name}</div>
+          <div class="mini-sub" style="color: ${dueColor}">Tempo: ${formatDate(b.due_date)}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="mini-amount" style="${isPaid ? 'color: var(--text-muted); font-weight: normal;' : 'color: var(--text-primary); font-weight: 700;'}">${idr(b.amount)}</div>
+          <button class="btn-icon btn-danger" onclick="deleteBill('${b.id}')" title="Hapus">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function toggleBillStatus(id) {
+  const b = BILLS.find(item => item.id === id);
+  if (!b) return;
+  const nextStatus = b.status === 'paid' ? 'pending' : 'paid';
+  
+  showLoader();
+  try {
+    const { error } = await sb.from('bills').update({ status: nextStatus }).eq('id', id);
+    if (error) throw error;
+    b.status = nextStatus;
+    renderAll();
+  } catch (err) {
+    alert('Gagal memperbarui tagihan: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+}
+
+async function deleteBill(id) {
+  if (!confirm('Hapus tagihan ini?')) return;
+  showLoader();
+  try {
+    const { error } = await sb.from('bills').delete().eq('id', id);
+    if (error) throw error;
+    BILLS = BILLS.filter(item => item.id !== id);
+    renderAll();
+  } catch (err) {
+    alert('Gagal menghapus tagihan: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+}
+
+// ── Saving Goals CRUD ──
+function renderSavingGoals() {
+  const el = $('goals-grid');
+  if (!el) return;
+  if (!SAVING_GOALS.length) {
+    el.innerHTML = '<div class="empty-msg">Belum ada target tabungan terdaftar</div>';
+    return;
+  }
+  el.innerHTML = SAVING_GOALS.map(g => {
+    const pct = g.target_amount ? Math.min(Math.round((g.current_amount / g.target_amount) * 100), 100) : 0;
+    return `
+      <div class="account-card" style="--card-color: var(--green); min-height: 140px; padding: 16px;">
+        <div>
+          <div class="acc-type-label" style="display:flex; justify-content:space-between; width:100%; font-size: 9px;">
+            <span>TARGET TABUNGAN</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="acc-name" style="margin-top: 4px;">${g.name}</div>
+          <div class="acc-balance" style="margin: 8px 0 6px; font-size: 17px; font-weight: 750;">
+            ${idr(g.current_amount)} <span style="font-size: 11px; font-weight: normal; color: var(--text-secondary)">dari ${idr(g.target_amount)}</span>
+          </div>
+          <div class="progress-track" style="margin-bottom: 8px; height: 6px;">
+            <div class="progress-bar" style="width: ${pct}%; background: var(--green)"></div>
+          </div>
+        </div>
+        <div class="acc-footer" style="padding-top: 8px; border-top: 1px solid var(--border);">
+          <span style="font-size: 10.5px; color: var(--text-muted)">Tempo: ${g.target_date ? formatDate(g.target_date) : '–'}</span>
+          <div class="acc-actions" style="display:flex; gap:4px;">
+            <button onclick="addMoneyToGoal('${g.id}')" style="padding: 2px 6px; font-size: 10.5px; background: var(--green-subtle); color: var(--green); border-color: transparent;">Isi</button>
+            <button onclick="deleteSavingGoal('${g.id}')" style="padding: 2px 4px; display:inline-flex; align-items:center;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function addMoneyToGoal(id) {
+  const g = SAVING_GOALS.find(item => item.id === id);
+  if (!g) return;
+  const input = prompt(`Masukkan nominal tabungan yang ingin ditambahkan ke "${g.name}":`);
+  if (!input) return;
+  const amount = parseFloat(input);
+  if (isNaN(amount) || amount <= 0) return alert('Nominal tidak valid!');
+  
+  showLoader();
+  try {
+    const newAmount = g.current_amount + amount;
+    const { error } = await sb.from('saving_goals').update({ current_amount: newAmount }).eq('id', id);
+    if (error) throw error;
+    g.current_amount = newAmount;
+    renderAll();
+  } catch (err) {
+    alert('Gagal menambah tabungan: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+}
+
+async function deleteSavingGoal(id) {
+  if (!confirm('Hapus target tabungan ini?')) return;
+  showLoader();
+  try {
+    const { error } = await sb.from('saving_goals').delete().eq('id', id);
+    if (error) throw error;
+    SAVING_GOALS = SAVING_GOALS.filter(item => item.id !== id);
+    renderAll();
+  } catch (err) {
+    alert('Gagal menghapus target: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+}
+
+// ── Debts & Loans CRUD ──
+function renderDebts() {
+  const listEl = $('debts-list');
+  if (!listEl) return;
+  if (!DEBTS.length) {
+    listEl.innerHTML = '<div class="empty-msg">Belum ada catatan hutang/piutang</div>';
+    return;
+  }
+  listEl.innerHTML = DEBTS.map(d => {
+    const isPaid = d.status === 'paid';
+    const isChecked = isPaid ? 'checked' : '';
+    const nameStyle = isPaid ? 'text-decoration: line-through; color: var(--text-muted);' : '';
+    const badgeBg = d.type === 'debt' ? 'var(--red-subtle)' : 'var(--green-subtle)';
+    const badgeColor = d.type === 'debt' ? 'var(--red)' : 'var(--green)';
+    const typeLabel = d.type === 'debt' ? 'HUTANG SAYA' : 'PIUTANG (LOAN)';
+    
+    return `
+      <div class="mini-item" style="padding: 12px 16px; align-items: center;">
+        <input type="checkbox" ${isChecked} onchange="toggleDebtStatus('${d.id}')" style="width: 16px; height: 16px; accent-color: var(--text-primary); cursor: pointer; margin-right: 8px;">
+        <div class="mini-icon" style="background: ${badgeBg}; color: ${badgeColor}; font-size: 9px; font-weight:700; width:auto; padding: 4px 6px; height:auto; border-radius: var(--radius-sm);">
+          ${typeLabel}
+        </div>
+        <div class="mini-info" style="margin-left: 10px;">
+          <div class="mini-title" style="${nameStyle}">${d.contact_name}</div>
+          <div class="mini-sub">Tempo: ${d.due_date ? formatDate(d.due_date) : '–'}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="mini-amount" style="${isPaid ? 'color: var(--text-muted); font-weight: normal;' : 'color: var(--text-primary); font-weight: 700;'}">${idr(d.amount)}</div>
+          <button class="btn-icon btn-danger" onclick="deleteDebt('${d.id}')" title="Hapus">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function toggleDebtStatus(id) {
+  const d = DEBTS.find(item => item.id === id);
+  if (!d) return;
+  const nextStatus = d.status === 'paid' ? 'unpaid' : 'paid';
+  
+  showLoader();
+  try {
+    const { error } = await sb.from('debts').update({ status: nextStatus }).eq('id', id);
+    if (error) throw error;
+    d.status = nextStatus;
+    renderAll();
+  } catch (err) {
+    alert('Gagal memperbarui status: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+}
+
+async function deleteDebt(id) {
+  if (!confirm('Hapus catatan ini?')) return;
+  showLoader();
+  try {
+    const { error } = await sb.from('debts').delete().eq('id', id);
+    if (error) throw error;
+    DEBTS = DEBTS.filter(item => item.id !== id);
+    renderAll();
+  } catch (err) {
+    alert('Gagal menghapus catatan: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+}
+
+// ── Modals Trigger Event Listeners ──
+const btnAddBill = $('btn-add-bill');
+if (btnAddBill) btnAddBill.addEventListener('click', () => {
+  $('form-bill').reset();
+  openModal('modal-bill');
+});
+
+$('form-bill').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('bill-name').value.trim();
+  const amount = parseFloat($('bill-amount').value);
+  const due_date = $('bill-due-date').value;
+  if (!name || isNaN(amount) || amount <= 0 || !due_date) return alert('Data tidak valid!');
+  
+  showLoader();
+  try {
+    const { error } = await sb.from('bills').insert({ user_id: USER.id, name, amount, due_date });
+    if (error) throw error;
+    closeModal('modal-bill');
+    await fetchBills();
+    renderAll();
+  } catch (err) {
+    alert('Gagal menyimpan tagihan: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+});
+
+const btnAddGoal = $('btn-add-goal');
+if (btnAddGoal) btnAddGoal.addEventListener('click', () => {
+  $('form-goal').reset();
+  openModal('modal-goal');
+});
+
+$('form-goal').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('goal-name').value.trim();
+  const target_amount = parseFloat($('goal-target').value);
+  const current_amount = parseFloat($('goal-current').value) || 0;
+  const target_date = $('goal-date').value || null;
+  if (!name || isNaN(target_amount) || target_amount <= 0) return alert('Data tidak valid!');
+  
+  showLoader();
+  try {
+    const { error } = await sb.from('saving_goals').insert({ user_id: USER.id, name, target_amount, current_amount, target_date });
+    if (error) throw error;
+    closeModal('modal-goal');
+    await fetchSavingGoals();
+    renderAll();
+  } catch (err) {
+    alert('Gagal menyimpan target: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+});
+
+const btnAddDebt = $('btn-add-debt');
+if (btnAddDebt) btnAddDebt.addEventListener('click', () => {
+  $('form-debt').reset();
+  openModal('modal-debt');
+});
+
+$('form-debt').addEventListener('submit', async e => {
+  e.preventDefault();
+  const contact_name = $('debt-contact').value.trim();
+  const amount = parseFloat($('debt-amount').value);
+  const type = $('debt-type').value;
+  const due_date = $('debt-due-date').value || null;
+  if (!contact_name || isNaN(amount) || amount <= 0 || !type) return alert('Data tidak valid!');
+  
+  showLoader();
+  try {
+    const { error } = await sb.from('debts').insert({ user_id: USER.id, contact_name, amount, type, due_date });
+    if (error) throw error;
+    closeModal('modal-debt');
+    await fetchDebts();
+    renderAll();
+  } catch (err) {
+    alert('Gagal menyimpan hutang: ' + err.message);
+  } finally {
+    hideLoader();
+  }
+});
+
+// ── Export CSV Function ──
+const btnExportCsv = $('btn-export-csv');
+if (btnExportCsv) {
+  btnExportCsv.addEventListener('click', () => {
+    if (!TRANSACTIONS.length) return alert('Belum ada transaksi untuk diekspor!');
+    
+    let csvContent = 'Tanggal,Jenis,Kategori,Rekening,Jumlah,Catatan\n';
+    
+    TRANSACTIONS.forEach(t => {
+      const dateStr = t.date || '';
+      const typeStr = t.type === 'income' ? 'Pemasukan' : (t.type === 'expense' ? 'Pengeluaran' : 'Transfer');
+      const catStr = categoryName(t.category_id).replace(/,/g, '');
+      const accStr = accountName(t.account_id).replace(/,/g, '');
+      const amtStr = t.amount || 0;
+      const noteStr = (t.notes || '').replace(/,/g, '');
+      
+      csvContent += `${dateStr},${typeStr},${catStr},${accStr},${amtStr},${noteStr}\n`;
+    });
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Financier_Ekspor_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
 
 // ── Init theme and wishlist ──
 initTheme();

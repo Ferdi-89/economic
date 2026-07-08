@@ -58,6 +58,37 @@ class TransactionFormNotifier extends ChangeNotifier {
   List<Category> get filteredCategories =>
       categories?.where((c) => c.type == type).toList() ?? [];
 
+  void updateNote(String value) {
+    note = value;
+    if (type != 'transfer') {
+      final rules = [
+        { 'keywords': ['makan', 'minum', 'kopi', 'starbucks', 'warung', 'restoran', 'gojek', 'grab', 'gofood', 'grabfood', 'kuliner', 'food'], 'cat': 'Makanan & Minuman' },
+        { 'keywords': ['bensin', 'parkir', 'tol', 'gojek', 'grab', 'mrt', 'lrt', 'krl', 'ojek', 'transport', 'taxi', 'taksi'], 'cat': 'Transportasi' },
+        { 'keywords': ['nonton', 'netflix', 'spotify', 'bioskop', 'game', 'gaming', 'steam', 'hiburan', 'liburan', 'travel', 'tiket'], 'cat': 'Hiburan' },
+        { 'keywords': ['skincare', 'sabun', 'shampoo', 'dokter', 'obat', 'apotek', 'sakit', 'klinik', 'kesehatan', 'gigi'], 'cat': 'Kesehatan & Perawatan' },
+        { 'keywords': ['listrik', 'air', 'pdam', 'internet', 'wifi', 'pulsa', 'kuota', 'tagihan', 'bpjs'], 'cat': 'Tagihan & Utilitas' },
+        { 'keywords': ['gaji', 'bonus', 'sampingan', 'deviden', 'investasi', 'bunga', 'income'], 'cat': 'Gaji' },
+        { 'keywords': ['belanja', 'tokopedia', 'shopee', 'lazada', 'baju', 'kaos', 'sepatu', 'mall', 'supermarket'], 'cat': 'Belanja' }
+      ];
+      final noteLower = value.toLowerCase();
+      for (final rule in rules) {
+        final keywords = rule['keywords'] as List<String>;
+        final catName = rule['cat'] as String;
+        if (keywords.any((kw) => noteLower.contains(kw))) {
+          final matched = filteredCategories.firstWhere(
+            (c) => c.name.toLowerCase().contains(catName.toLowerCase()) || catName.toLowerCase().contains(c.name.toLowerCase()),
+            orElse: () => null as dynamic,
+          );
+          if (matched != null) {
+            categoryId = matched.id;
+            break;
+          }
+        }
+      }
+    }
+    notifyListeners();
+  }
+
   Future<void> submit() async {
     if (accountId == null || categoryId == null || amount <= 0) return;
     loading = true;
@@ -200,7 +231,7 @@ class TransactionFormScreen extends ConsumerWidget {
                   labelText: 'Catatan (opsional)',
                   prefixIcon: Icon(Icons.notes)),
               maxLines: 2,
-              onChanged: (v) => form.note = v,
+              onChanged: (v) => form.updateNote(v),
             ),
             const SizedBox(height: 20),
             InkWell(

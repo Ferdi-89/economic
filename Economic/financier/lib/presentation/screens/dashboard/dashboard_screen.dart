@@ -14,6 +14,10 @@ import '../../../data/repositories/category_repository.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/account.dart';
 import '../../../data/models/category.dart';
+import '../../../data/models/bill.dart';
+import '../../../data/models/saving_goal.dart';
+import '../../../data/models/debt.dart';
+import '../../../data/repositories/new_features_repository.dart';
 import '../../widgets/transaction_tile.dart';
 import 'wishlist_provider.dart';
 
@@ -21,6 +25,9 @@ final _dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async
   final userId = ref.read(authRepositoryProvider).currentUser!.id;
   final txRepo = ref.read(transactionRepositoryProvider);
   final accRepo = ref.read(accountRepositoryProvider);
+  final billRepo = ref.read(billRepositoryProvider);
+  final goalRepo = ref.read(savingGoalRepositoryProvider);
+  final debtRepo = ref.read(debtRepositoryProvider);
 
   final now = DateTime.now();
   final startOfMonth = DateTime(now.year, now.month, 1);
@@ -31,6 +38,9 @@ final _dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async
     txRepo.getTotalIncome(userId, startOfMonth, endOfMonth),
     txRepo.getTotalExpense(userId, startOfMonth, endOfMonth),
     accRepo.getAll(userId),
+    billRepo.getAll(userId),
+    goalRepo.getAll(userId),
+    debtRepo.getAll(userId),
   ]);
 
   return DashboardData(
@@ -38,6 +48,9 @@ final _dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async
     monthlyIncome: results[1] as double,
     monthlyExpense: results[2] as double,
     accounts: results[3] as List<Account>,
+    bills: results[4] as List<Bill>,
+    savingGoals: results[5] as List<SavingGoal>,
+    debts: results[6] as List<Debt>,
   );
 });
 
@@ -46,12 +59,18 @@ class DashboardData {
   final double monthlyIncome;
   final double monthlyExpense;
   final List<Account> accounts;
+  final List<Bill> bills;
+  final List<SavingGoal> savingGoals;
+  final List<Debt> debts;
 
   DashboardData({
     required this.recentTransactions,
     required this.monthlyIncome,
     required this.monthlyExpense,
     required this.accounts,
+    required this.bills,
+    required this.savingGoals,
+    required this.debts,
   });
 
   double get balance => monthlyIncome - monthlyExpense;
@@ -170,7 +189,10 @@ class DashboardScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final fmt = NumberFormat('#,###', 'id_ID');
     final actualBalance = d.accounts.fold<double>(0, (sum, acc) => sum + acc.balance);
-    final displayBalance = isSimulated ? (actualBalance - wishlistDeduction) : actualBalance;
+    final totalLoans = d.debts.where((debt) => debt.type == 'loan' && debt.status == 'unpaid').fold<double>(0, (sum, debt) => sum + debt.amount);
+    final totalDebts = d.debts.where((debt) => debt.type == 'debt' && debt.status == 'unpaid').fold<double>(0, (sum, debt) => sum + debt.amount);
+    final netWorth = actualBalance + totalLoans - totalDebts;
+    final displayBalance = isSimulated ? (netWorth - wishlistDeduction) : netWorth;
 
     return Card(
       elevation: 8,
@@ -201,7 +223,7 @@ class DashboardScreen extends ConsumerWidget {
                     const Icon(Icons.account_balance_wallet, color: Colors.white70, size: 16),
                     const SizedBox(width: 8),
                     Text(
-                      isSimulated ? 'Simulasi Total Saldo' : 'Total Saldo Anda',
+                      isSimulated ? 'Simulasi Kekayaan Bersih' : 'Kekayaan Bersih (Net Worth)',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
@@ -247,18 +269,17 @@ class DashboardScreen extends ConsumerWidget {
                 letterSpacing: -0.5,
               ),
             ),
-            if (isSimulated) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Saldo Asli: Rp${fmt.format(actualBalance.toInt())} - Wishlist: Rp${fmt.format(wishlistDeduction.toInt())}',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.75),
-                  fontSize: 11,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w400,
-                ),
+            const SizedBox(height: 6),
+            Text(
+              isSimulated
+                  ? 'Asli NW: Rp${fmt.format(netWorth.toInt())} - Wishlist: Rp${fmt.format(wishlistDeduction.toInt())}'
+                  : 'Aset: Rp${fmt.format(actualBalance.toInt())} · Hutang: Rp${fmt.format(totalDebts.toInt())} · Piutang: Rp${fmt.format(totalLoans.toInt())}',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
-            ],
+            ),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),

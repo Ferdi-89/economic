@@ -98,7 +98,7 @@ class WishlistScreen extends ConsumerWidget {
                           value: isActive,
                           activeColor: theme.colorScheme.primary,
                           onChanged: (v) {
-                            ref.read(wishlistSimulationActiveProvider.notifier).state = v;
+                            ref.read(wishlistProvider.notifier).setSimulationActive(v);
                           },
                         ),
                       ],

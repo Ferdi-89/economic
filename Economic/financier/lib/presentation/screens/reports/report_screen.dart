@@ -38,10 +38,11 @@ final _reportProvider = FutureProvider.autoDispose<ReportData>((ref) async {
   }
 
   return ReportData(
-      monthlyData: monthData.reversed.toList(), // Chronological order (left to right)
+      monthlyData: monthData.reversed.toList(),
       categories: categories,
       catSpending: catSpending,
-      recentTransactions: recentTxs);
+      recentTransactions: recentTxs,
+      allTransactions: recentTxs);
 });
 
 class ReportData {
@@ -49,12 +50,14 @@ class ReportData {
   final List<Category> categories;
   final Map<String, double> catSpending;
   final List<Transaction> recentTransactions;
+  final List<Transaction> allTransactions;
 
   ReportData({
     required this.monthlyData,
     required this.categories,
     required this.catSpending,
     required this.recentTransactions,
+    required this.allTransactions,
   });
 }
 
@@ -177,8 +180,10 @@ class ReportScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              // Stat cards
+              if (d.allTransactions.isNotEmpty) ..._buildStatCards(context, d),
               const SizedBox(height: 16),
-              
+
               // Category breakdown
               Card(
                 elevation: 0,
@@ -292,6 +297,91 @@ class ReportScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildStatCards(BuildContext context, ReportData d) {
+    final theme = Theme.of(context);
+    final fmt = NumberFormat('#,###', 'id_ID');
+    final now = DateTime.now();
+    final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+    final monthTx = d.allTransactions
+        .where((t) => (t.date.year == now.year && t.date.month == now.month))
+        .toList();
+    final income = monthTx.where((t) => t.type == 'income').fold<double>(0, (s, t) => s + t.amount);
+    final expense = monthTx.where((t) => t.type == 'expense').fold<double>(0, (s, t) => s + t.amount);
+    final net = income - expense;
+    final savingsRate = income > 0 ? (net / income * 100).toInt() : 0;
+
+    // MoM comparison
+    final lastMonth = DateTime(now.year, now.month - 1, 1);
+    final lastMonthExpense = d.allTransactions
+        .where((t) => t.type == 'expense' && t.date.year == lastMonth.year && t.date.month == lastMonth.month)
+        .fold<double>(0, (s, t) => s + t.amount);
+    final momPct = lastMonthExpense > 0 ? ((expense - lastMonthExpense) / lastMonthExpense * 100).toInt() : 0;
+
+    // Daily average
+    final dayCount = now.day;
+    final dailyAvg = dayCount > 0 ? expense / dayCount : 0;
+
+    // Top category
+    final catMap = <String, double>{};
+    for (final t in monthTx.where((t) => t.type == 'expense')) {
+      catMap.update(t.categoryId, (v) => v + t.amount, ifAbsent: () => t.amount);
+    }
+    String? topCatId;
+    double topCatVal = 0;
+    for (final e in catMap.entries) {
+      if (e.value > topCatVal) { topCatVal = e.value; topCatId = e.key; }
+    }
+    final topCatName = topCatId != null
+        ? d.categories.where((c) => c.id == topCatId).firstOrNull?.name ?? '–'
+        : '–';
+
+    return [
+      // Row 1: Savings rate + MoM
+      Row(children: [
+        Expanded(child: Card(
+          child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Rasio Tabungan', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text('$savingsRate%', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: net >= 0 ? AppColors.income : AppColors.expense)),
+            Text('Bersih: ${fmt.format(net.toInt())}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+          ])),
+        )),
+        const SizedBox(width: 12),
+        Expanded(child: Card(
+          child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('MoM Pengeluaran', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text('${momPct > 0 ? '+' : ''}$momPct%', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: momPct > 0 ? AppColors.expense : (momPct < 0 ? AppColors.income : theme.colorScheme.onSurface))),
+            Text('Bulan lalu: ${fmt.format(lastMonthExpense.toInt())}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+          ])),
+        )),
+      ]),
+      const SizedBox(height: 12),
+      // Row 2: Daily avg + Top category
+      Row(children: [
+        Expanded(child: Card(
+          child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Rata-rata Harian', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text(fmt.format(dailyAvg.toInt()), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+            Text('${dayCount} hari bulan ini', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+          ])),
+        )),
+        const SizedBox(width: 12),
+        Expanded(child: Card(
+          child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Top Kategori', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text(topCatName, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text('Total: ${fmt.format(topCatVal.toInt())}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+          ])),
+        )),
+      ]),
+      const SizedBox(height: 16),
+    ];
   }
 
   Widget _legendDot(Color color, String label) {

@@ -9,6 +9,8 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/transaction_repository.dart';
 import '../../../data/models/user_profile.dart';
 
+enum ExportFormat { csv, text }
+
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -158,6 +160,30 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _handleExportData(BuildContext context, WidgetRef ref) async {
+    final result = await showDialog<ExportFormat>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Ekspor Transaksi', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Pilih format ekspor:'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          FilledButton.icon(
+            icon: const Icon(Icons.table_chart, size: 18),
+            label: const Text('CSV (Spreadsheet)'),
+            onPressed: () => Navigator.pop(ctx, ExportFormat.csv),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.description, size: 18),
+            label: const Text('Teks (Dibagikan)'),
+            onPressed: () => Navigator.pop(ctx, ExportFormat.text),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -168,31 +194,54 @@ class SettingsScreen extends ConsumerWidget {
       final user = ref.read(authRepositoryProvider).currentUser;
       if (user == null) return;
 
-      final transactions = await ref.read(transactionRepositoryProvider).getAll(user.id, limit: 1000);
-      
-      // Build CSV String
-      final csvBuffer = StringBuffer();
-      csvBuffer.writeln('Tanggal,Tipe,Jumlah,Catatan');
-      
-      final dateFormat = DateFormat('yyyy-MM-dd');
-      for (final tx in transactions) {
-        final dateStr = dateFormat.format(tx.date);
-        final cleanNote = (tx.note ?? 'Transaksi').replaceAll(',', ' ');
-        csvBuffer.writeln('$dateStr,${tx.type},${tx.amount.toInt()},$cleanNote');
+      final transactions = await ref.read(transactionRepositoryProvider).getAll(user.id, limit: 5000);
+
+      if (transactions.isEmpty) {
+        if (context.mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Belum ada transaksi untuk diekspor')),
+          );
+        }
+        return;
       }
 
-      if (context.mounted) Navigator.pop(context); // Close loading indicator
+      final dateFormat = DateFormat('yyyy-MM-dd');
 
-      // Share CSV content
-      await Share.share(
-        csvBuffer.toString(),
-        subject: 'Ekspor Data Keuangan Financier',
-      );
+      if (result == ExportFormat.csv) {
+        final buf = StringBuffer();
+        buf.writeln('Tanggal,Jenis,Kategori,Rekening,Jumlah,Catatan');
+        for (final tx in transactions) {
+          final typeLabel = tx.type == 'income' ? 'Pemasukan' : (tx.type == 'expense' ? 'Pengeluaran' : 'Transfer');
+          buf.writeln('${dateFormat.format(tx.date)},$typeLabel,${tx.categoryId ?? ''},${tx.accountId ?? ''},${tx.amount.toStringAsFixed(0)},${(tx.note ?? '').replaceAll(',', ' ')}');
+        }
+        if (context.mounted) {
+          Navigator.pop(context);
+          await Share.share(buf.toString(), subject: 'Financier_Transaksi.csv');
+        }
+      } else {
+        final buf = StringBuffer();
+        buf.writeln('=== Ekspor Transaksi Financier ===');
+        buf.writeln('Diekspor: ${DateFormat('dd MMMM yyyy', 'id').format(DateTime.now())}');
+        buf.writeln('Total: ${transactions.length} transaksi');
+        buf.writeln('');
+        for (final tx in transactions.take(100)) {
+          final sign = tx.isIncome ? '+' : (tx.isExpense ? '-' : '⇄');
+          buf.writeln('${dateFormat.format(tx.date)} | $sign${tx.amount.toStringAsFixed(0)} | ${tx.note ?? '-'}');
+        }
+        if (transactions.length > 100) {
+          buf.writeln('... dan ${transactions.length - 100} transaksi lainnya.');
+        }
+        if (context.mounted) {
+          Navigator.pop(context);
+          await Share.share(buf.toString(), subject: 'Laporan Keuangan Financier');
+        }
+      }
     } catch (e) {
       if (context.mounted) {
-        Navigator.pop(context); // Close loading indicator
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengekspor data: $e')),
+          SnackBar(content: Text('Gagal mengekspor: $e')),
         );
       }
     }

@@ -115,6 +115,18 @@
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         Simulasi
       </a>
+      <a href="#" class="nav-item" data-tab="bills">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+        Tagihan
+      </a>
+      <a href="#" class="nav-item" data-tab="goals">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><circle cx="12" cy="12" r="10"/></svg>
+        Tabungan
+      </a>
+      <a href="#" class="nav-item" data-tab="debts">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Hutang
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -157,7 +169,7 @@
       <section id="tab-dashboard" class="panel">
         <div class="stats-row">
           <div class="stat-card stat-card-hero">
-            <div class="stat-label">Total Saldo Keseluruhan</div>
+            <div class="stat-label">Kekayaan Bersih (Net Worth)</div>
             <div class="stat-value" id="stat-balance">Rp 0</div>
             <div class="stat-sub" id="stat-accounts-count">0 rekening aktif</div>
           </div>
@@ -227,6 +239,13 @@
 
       <!-- REPORTS -->
       <section id="tab-reports" class="panel hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="font-family: var(--font-display); font-size: 16px; font-weight: 700; margin: 0;">Laporan Finansial</h2>
+          <button class="btn btn-ghost" id="btn-export-csv" style="padding: 6px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Ekspor CSV
+          </button>
+        </div>
         <div class="stats-row" style="margin-bottom: 20px;">
           <div class="stat-card" style="border-left: 3px solid var(--green);">
             <div class="stat-label">Rasio Tabungan (Saving Rate)</div>
@@ -242,6 +261,19 @@
             <div class="stat-label">Kategori Terboros</div>
             <div class="stat-value" id="report-top-category" style="font-size: 20px; font-weight: 800; padding: 4px 0;">–</div>
             <div class="stat-sub" id="report-top-category-value">Total: Rp 0</div>
+          </div>
+        </div>
+
+        <div class="stats-row" style="margin-bottom: 20px;">
+          <div class="stat-card" style="border-left: 3px solid var(--blue);">
+            <div class="stat-label">Rerata Pengeluaran Harian / Mingguan</div>
+            <div class="stat-value" id="report-avg-daily-weekly" style="font-size: 16px; font-weight: 750; padding: 4px 0;">Rp 0 / Rp 0</div>
+            <div class="stat-sub">Berdasarkan total belanja bulan ini</div>
+          </div>
+          <div class="stat-card" style="border-left: 3px solid var(--amber);">
+            <div class="stat-label">Perbandingan Bulan Lalu (MoM)</div>
+            <div class="stat-value" id="report-mom-value" style="font-size: 16px; font-weight: 750; padding: 4px 0;">0%</div>
+            <div class="stat-sub" id="report-mom-sub">Pengeluaran dibanding bulan lalu</div>
           </div>
         </div>
 
@@ -304,6 +336,45 @@
             <div id="wishlist-items-list" class="mini-list">
               <!-- Dynamically populated -->
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BILLS (TAGIHAN) -->
+      <section id="tab-bills" class="panel hidden">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title"><span class="card-title-dot" style="background:var(--red)"></span> Pemantauan Tagihan Bulanan</span>
+            <button class="btn btn-primary" id="btn-add-bill" style="padding: 4px 10px; font-size: 11.5px;">Tambah Tagihan</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div id="bills-list" class="mini-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GOALS (TABUNGAN) -->
+      <section id="tab-goals" class="panel hidden">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title"><span class="card-title-dot" style="background:var(--green)"></span> Target Tabungan (Saving Goals)</span>
+            <button class="btn btn-primary" id="btn-add-goal" style="padding: 4px 10px; font-size: 11.5px;">Tambah Target</button>
+          </div>
+          <div class="card-body" style="padding: 16px;">
+            <div id="goals-grid" class="accounts-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DEBTS (HUTANG & PIUTANG) -->
+      <section id="tab-debts" class="panel hidden">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title"><span class="card-title-dot" style="background:var(--amber)"></span> Pencatatan Hutang & Piutang</span>
+            <button class="btn btn-primary" id="btn-add-debt" style="padding: 4px 10px; font-size: 11.5px;">Tambah Hutang/Piutang</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div id="debts-list" class="mini-list"></div>
           </div>
         </div>
       </section>
@@ -543,6 +614,116 @@
       <div class="modal-foot">
         <button type="button" class="btn btn-ghost modal-close" data-modal="modal-wishlist">Batal</button>
         <button type="submit" class="btn btn-primary" id="wish-submit">Simpan Barang</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ MODAL: BILL ═══ -->
+<div id="modal-bill" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Tambah Tagihan Baru</h3>
+      <button class="modal-close-icon modal-close" data-modal="modal-bill">&times;</button>
+    </div>
+    <form id="form-bill">
+      <div class="modal-body">
+        <input type="hidden" id="bill-edit-id">
+        <div class="form-group">
+          <label class="form-label">Nama Tagihan *</label>
+          <input type="text" id="bill-name" placeholder="Listrik, Netflix, Wifi..." required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Jumlah (Rp) *</label>
+            <input type="number" id="bill-amount" min="1" placeholder="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tanggal Jatuh Tempo *</label>
+            <input type="date" id="bill-due-date" required>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost modal-close" data-modal="modal-bill">Batal</button>
+        <button type="submit" class="btn btn-primary" id="bill-submit">Simpan Tagihan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ MODAL: SAVING GOAL ═══ -->
+<div id="modal-goal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Target Tabungan</h3>
+      <button class="modal-close-icon modal-close" data-modal="modal-goal">&times;</button>
+    </div>
+    <form id="form-goal">
+      <div class="modal-body">
+        <input type="hidden" id="goal-edit-id">
+        <div class="form-group">
+          <label class="form-label">Nama Target *</label>
+          <input type="text" id="goal-name" placeholder="Beli Laptop, Dana Darurat..." required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Target Nominal (Rp) *</label>
+            <input type="number" id="goal-target" min="1" placeholder="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Terkumpul Saat Ini (Rp)</label>
+            <input type="number" id="goal-current" min="0" placeholder="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Target Tanggal (Opsional)</label>
+          <input type="date" id="goal-date">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost modal-close" data-modal="modal-goal">Batal</button>
+        <button type="submit" class="btn btn-primary" id="goal-submit">Simpan Target</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ MODAL: DEBT ═══ -->
+<div id="modal-debt" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Hutang / Piutang</h3>
+      <button class="modal-close-icon modal-close" data-modal="modal-debt">&times;</button>
+    </div>
+    <form id="form-debt">
+      <div class="modal-body">
+        <input type="hidden" id="debt-edit-id">
+        <div class="form-group">
+          <label class="form-label">Nama Orang / Kontak *</label>
+          <input type="text" id="debt-contact" placeholder="Nama teman, institusi..." required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Jumlah (Rp) *</label>
+            <input type="number" id="debt-amount" min="1" placeholder="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Jenis Catatan *</label>
+            <select id="debt-type" required>
+              <option value="debt">Hutang (Saya berhutang ke orang)</option>
+              <option value="loan">Piutang (Orang berhutang ke saya)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Jatuh Tempo (Opsional)</label>
+          <input type="date" id="debt-due-date">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost modal-close" data-modal="modal-debt">Batal</button>
+        <button type="submit" class="btn btn-primary" id="debt-submit">Simpan Catatan</button>
       </div>
     </form>
   </div>

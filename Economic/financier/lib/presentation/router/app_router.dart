@@ -14,6 +14,9 @@ import '../screens/budgets/budget_detail_screen.dart';
 import '../screens/reports/report_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/wishlist/wishlist_screen.dart';
+import '../screens/bills/bill_list_screen.dart';
+import '../screens/goals/goal_list_screen.dart';
+import '../screens/debts/debt_list_screen.dart';
 import '../../data/repositories/auth_repository.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -86,6 +89,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               path: '/wishlist',
               builder: (_, __) => const WishlistScreen()),
           GoRoute(
+              path: '/bills',
+              builder: (_, __) => const BillListScreen()),
+          GoRoute(
+              path: '/goals',
+              builder: (_, __) => const GoalListScreen()),
+          GoRoute(
+              path: '/debts',
+              builder: (_, __) => const DebtListScreen()),
+          GoRoute(
               path: '/budgets',
               builder: (_, __) => const BudgetListScreen()),
           GoRoute(
@@ -143,6 +155,18 @@ class MainShell extends StatelessWidget {
                 selectedIcon: Icon(Icons.auto_awesome, size: 24),
                 label: 'Wishlist'),
             NavigationDestination(
+                icon: Icon(Icons.receipt_outlined, size: 22),
+                selectedIcon: Icon(Icons.receipt, size: 24),
+                label: 'Tagihan'),
+            NavigationDestination(
+                icon: Icon(Icons.savings_outlined, size: 22),
+                selectedIcon: Icon(Icons.savings, size: 24),
+                label: 'Tabungan'),
+            NavigationDestination(
+                icon: Icon(Icons.people_outline, size: 22),
+                selectedIcon: Icon(Icons.people, size: 24),
+                label: 'Hutang'),
+            NavigationDestination(
                 icon: Icon(Icons.bar_chart_outlined, size: 22),
                 selectedIcon: Icon(Icons.bar_chart, size: 24),
                 label: 'Laporan'),
@@ -161,25 +185,25 @@ class MainShell extends StatelessWidget {
     if (location.startsWith('/accounts')) return 1;
     if (location.startsWith('/transactions')) return 2;
     if (location.startsWith('/wishlist')) return 3;
-    if (location.startsWith('/reports')) return 4;
-    if (location.startsWith('/settings')) return 5;
+    if (location.startsWith('/bills')) return 4;
+    if (location.startsWith('/goals')) return 5;
+    if (location.startsWith('/debts')) return 6;
+    if (location.startsWith('/reports')) return 7;
+    if (location.startsWith('/settings')) return 8;
     return 0;
   }
 
   void _onTap(int index, BuildContext context) {
     switch (index) {
-      case 0:
-        context.go('/');
-      case 1:
-        context.go('/accounts');
-      case 2:
-        context.go('/transactions');
-      case 3:
-        context.go('/wishlist');
-      case 4:
-        context.go('/reports');
-      case 5:
-        context.go('/settings');
+      case 0: context.go('/');
+      case 1: context.go('/accounts');
+      case 2: context.go('/transactions');
+      case 3: context.go('/wishlist');
+      case 4: context.go('/bills');
+      case 5: context.go('/goals');
+      case 6: context.go('/debts');
+      case 7: context.go('/reports');
+      case 8: context.go('/settings');
     }
   }
 }
