@@ -105,6 +105,10 @@ async function fetchBudgets() {
     if (!e2) BUDGET_ITEMS = items || [];
   }
 }
+async function fetchWishlist() {
+  const { data, error } = await sb.from('wishlist').select('*').eq('user_id', USER.id).order('created_at');
+  if (!error) WISHLIST = data || [];
+}
 
 // ── Render all ──
 function renderAll() {
@@ -113,6 +117,7 @@ function renderAll() {
   renderAccounts();
   renderBudgets();
   renderReports();
+  renderWishlist();
   populateSelects();
 }
 
@@ -124,8 +129,17 @@ function renderDashboard() {
   const income   = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
   const expense  = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
 
-  $('stat-balance').textContent = idr(totalBalance);
-  $('stat-accounts-count').textContent = `${ACCOUNTS.length} rekening aktif`;
+  // Wishlist simulation logic
+  const totalSimulated = WISHLIST.filter(item => item.isEnabled).reduce((s, item) => s + (item.price || 0), 0);
+  
+  if (wishlistSimulationActive) {
+    $('stat-balance').textContent = idr(totalBalance - totalSimulated);
+    $('stat-accounts-count').innerHTML = `<span style="color:var(--amber); font-weight:600;">Mode Simulasi Aktif</span> (Asli: ${idr(totalBalance)})`;
+  } else {
+    $('stat-balance').textContent = idr(totalBalance);
+    $('stat-accounts-count').textContent = `${ACCOUNTS.length} rekening aktif`;
+  }
+
   $('stat-income').textContent  = idr(income);
   $('stat-expense').textContent = idr(expense);
 
@@ -136,7 +150,9 @@ function renderDashboard() {
   } else {
     accEl.innerHTML = ACCOUNTS.slice(0,5).map(a => `
       <div class="mini-item">
-        <div class="mini-icon" style="background:${a.color || '#0ea5e9'}22; font-size:.9rem;">💳</div>
+        <div class="mini-icon" style="background:${a.color || '#0ea5e9'}22; color:${a.color || '#0ea5e9'};">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+        </div>
         <div class="mini-info">
           <div class="mini-title">${a.name}</div>
           <div class="mini-sub">${accountTypeLabel(a.account_type)}</div>
@@ -170,7 +186,7 @@ function renderTransactions() {
   }
   el.innerHTML = list.map(t => `
     <div class="tx-item">
-      <div class="tx-type-badge ${t.type}">${typeEmoji(t.type)}</div>
+      <div class="tx-type-badge ${t.type}">${typeIcon(t.type)}</div>
       <div class="tx-body">
         <div class="tx-note">${t.notes || '–'}</div>
         <div class="tx-meta">${categoryName(t.category_id)} · ${accountName(t.account_id)}</div>
@@ -180,8 +196,12 @@ function renderTransactions() {
         <div class="tx-date">${formatDate(t.date)}</div>
       </div>
       <div class="tx-actions">
-        <button class="btn-icon" onclick="editTx('${t.id}')" title="Edit">✏️</button>
-        <button class="btn-icon btn-danger" onclick="deleteTx('${t.id}')" title="Hapus">🗑️</button>
+        <button class="btn-icon" onclick="editTx('${t.id}')" title="Edit">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+        <button class="btn-icon btn-danger" onclick="deleteTx('${t.id}')" title="Hapus">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+        </button>
       </div>
     </div>`).join('');
 }
@@ -189,7 +209,7 @@ function renderTransactions() {
 function txItemHTML(t) {
   return `
     <div class="mini-item">
-      <div class="mini-icon" style="background:${typeColor(t.type)}22">${typeEmoji(t.type)}</div>
+      <div class="mini-icon ${t.type}">${typeIcon(t.type)}</div>
       <div class="mini-info">
         <div class="mini-title">${t.notes || categoryName(t.category_id) || '–'}</div>
         <div class="mini-sub">${accountName(t.account_id)} · ${formatDate(t.date)}</div>
@@ -215,8 +235,10 @@ function renderAccounts() {
       <div class="acc-footer">
         <span class="acc-bank">${a.bank_name || a.account_number || ''}</span>
         <div class="acc-actions">
-          <button onclick="editAccount('${a.id}')">✏️ Edit</button>
-          <button onclick="deleteAccount('${a.id}')">🗑️</button>
+          <button onclick="editAccount('${a.id}')">Ubah</button>
+          <button onclick="deleteAccount('${a.id}')" title="Hapus">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
         </div>
       </div>
     </div>`).join('');
@@ -836,12 +858,166 @@ function categoryName(id)  { return CATEGORIES.find(c => c.id === id)?.name || '
 function accountTypeLabel(t) {
   return { cash:'Tunai', bank:'Bank', ewallet:'E-Wallet', savings:'Tabungan', investment:'Investasi' }[t] || t;
 }
-function typeEmoji(t)  { return { income:'↓', expense:'↑', transfer:'⇄' }[t] || '•'; }
+function typeIcon(t) {
+  if (t === 'income') {
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>`;
+  }
+  if (t === 'expense') {
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 7v10H7"/></svg>`;
+  }
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17H4M4 17l4 4M4 17l4-4M4 7h16M20 7l-4-4M20 7l-4 4"/></svg>`;
+}
 function typeColor(t)  { return { income:'#10b981', expense:'#ef4444', transfer:'#f59e0b' }[t] || '#6366f1'; }
 function formatDate(d) {
   if (!d) return '';
   return new Date(d + 'T00:00:00').toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' });
 }
 
-// ── Init theme immediately ──
+// ── Wishlist Simulation Logic ──
+let WISHLIST = [];
+let wishlistSimulationActive = false;
+
+function initWishlist() {
+  const data = localStorage.getItem('wishlist_items');
+  if (data) {
+    try { WISHLIST = JSON.parse(data); } catch(e) { WISHLIST = []; }
+  }
+  wishlistSimulationActive = localStorage.getItem('wishlist_sim_active') === 'true';
+  
+  const toggle = $('wishlist-sim-toggle');
+  if (toggle) {
+    toggle.checked = wishlistSimulationActive;
+    // Remove previous listeners first to prevent duplicates
+    const newToggle = toggle.cloneNode(true);
+    toggle.parentNode.replaceChild(newToggle, toggle);
+    newToggle.addEventListener('change', e => {
+      wishlistSimulationActive = e.target.checked;
+      localStorage.setItem('wishlist_sim_active', wishlistSimulationActive);
+      renderAll();
+    });
+  }
+  
+  const form = $('form-wishlist');
+  if (form) {
+    // Prevent duplicate event listener registration
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    newForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const name = $('wish-name').value.trim();
+      const price = parseFloat($('wish-price').value) || 0;
+      const url = $('wish-url').value.trim();
+      if (!name) return alert('Nama barang wajib diisi');
+      if (price <= 0) return alert('Harga barang harus lebih dari 0');
+      
+      const item = {
+        id: Date.now().toString(),
+        name,
+        price,
+        url: url || null,
+        isEnabled: true
+      };
+      
+      WISHLIST.push(item);
+      saveWishlist();
+      closeModal('modal-wishlist');
+      renderAll();
+    });
+  }
+  
+  const btnAdd = $('btn-add-wishlist');
+  if (btnAdd) {
+    const newBtnAdd = btnAdd.cloneNode(true);
+    btnAdd.parentNode.replaceChild(newBtnAdd, btnAdd);
+    newBtnAdd.addEventListener('click', () => {
+      $('form-wishlist').reset();
+      openModal('modal-wishlist');
+    });
+  }
+}
+
+function saveWishlist() {
+  localStorage.setItem('wishlist_items', JSON.stringify(WISHLIST));
+}
+
+function deleteWishlistItem(id) {
+  WISHLIST = WISHLIST.filter(item => item.id !== id);
+  saveWishlist();
+  renderAll();
+}
+
+function toggleWishlistItem(id) {
+  WISHLIST = WISHLIST.map(item => {
+    if (item.id === id) {
+      return { ...item, isEnabled: !item.isEnabled };
+    }
+    return item;
+  });
+  saveWishlist();
+  renderAll();
+}
+
+function renderWishlist() {
+  const listEl = $('wishlist-items-list');
+  if (!listEl) return;
+  
+  const totalBalance = ACCOUNTS.reduce((s, a) => s + (a.balance || 0), 0);
+  const totalSimulated = WISHLIST.filter(item => item.isEnabled).reduce((s, item) => s + (item.price || 0), 0);
+  
+  const realBalEl = $('wishlist-real-balance');
+  if (realBalEl) realBalEl.textContent = idr(totalBalance);
+  
+  const totalPrEl = $('wishlist-total-price');
+  if (totalPrEl) totalPrEl.textContent = `- ${idr(totalSimulated)}`;
+  
+  const simBalEl = $('wishlist-simulated-balance');
+  if (simBalEl) {
+    simBalEl.textContent = idr(wishlistSimulationActive ? (totalBalance - totalSimulated) : totalBalance);
+    simBalEl.style.color = wishlistSimulationActive ? 'var(--amber)' : 'var(--text-primary)';
+  }
+  
+  const labelEl = $('wishlist-estimate-label');
+  if (labelEl) {
+    labelEl.textContent = wishlistSimulationActive ? 'Estimasi Sisa Saldo (Simulasi)' : 'Total Saldo Asli';
+  }
+  
+  if (!WISHLIST.length) {
+    listEl.innerHTML = '<div class="empty-msg" style="padding: 30px 16px;">Belum ada barang di wishlist simulasi</div>';
+    return;
+  }
+  
+  listEl.innerHTML = WISHLIST.map(item => {
+    const isChecked = item.isEnabled ? 'checked' : '';
+    const nameStyle = item.isEnabled ? '' : 'text-decoration: line-through; color: var(--text-muted);';
+    const priceStyle = item.isEnabled && wishlistSimulationActive ? 'color: var(--brand); font-weight: 700;' : 'color: var(--text-secondary);';
+    
+    const linkBtn = item.url ? `
+      <a href="${item.url}" target="_blank" class="btn-icon" title="Buka Link Barang" style="color:var(--brand); display:inline-flex; align-items:center;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      </a>` : '';
+      
+    return `
+      <div class="mini-item" style="padding: 10px 16px; align-items: center;">
+        <input type="checkbox" ${isChecked} onchange="toggleWishlistItem('${item.id}')" style="width: 16px; height: 16px; accent-color: var(--text-primary); cursor: pointer; margin-right: 8px;">
+        <div class="mini-info" style="margin-left: 0;">
+          <div class="mini-title" style="${nameStyle}">${item.name}</div>
+          <div class="mini-sub" style="${priceStyle}">${idr(item.price)}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          ${linkBtn}
+          <button class="btn-icon btn-danger" onclick="deleteWishlistItem('${item.id}')" title="Hapus">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Bind to window to allow inline html event calls
+window.toggleWishlistItem = toggleWishlistItem;
+window.deleteWishlistItem = deleteWishlistItem;
+
+// ── Init theme and wishlist ──
 initTheme();
+initWishlist();

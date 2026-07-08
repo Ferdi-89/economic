@@ -111,6 +111,10 @@
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         Laporan
       </a>
+      <a href="#" class="nav-item" data-tab="wishlist">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Simulasi
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -253,6 +257,53 @@
               <span class="card-title"><span class="card-title-dot" style="background:var(--brand)"></span> Pengeluaran per Kategori</span>
             </div>
             <div class="chart-container"><canvas id="chart-pie"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WISHLIST SIMULATION -->
+      <section id="tab-wishlist" class="panel hidden">
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-body" style="padding: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--amber);"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <h3 style="font-family: var(--font-display); font-size: 15px; font-weight: 700;">Simulasi Finansial (Wishlist)</h3>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="form-label" style="margin-bottom: 0;">Aktifkan Simulasi</span>
+                <input type="checkbox" id="wishlist-sim-toggle" style="width: 16px; height: 16px; accent-color: var(--text-primary); cursor: pointer;">
+              </div>
+            </div>
+            <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
+              Aktifkan simulasi untuk melihat dampak pembelian barang-barang wishlist terhadap total saldo riil Anda saat ini.
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; border-top: 1px solid var(--border); padding-top: 16px;">
+              <div>
+                <div class="stat-label">Total Saldo Riil</div>
+                <div class="stat-value" id="wishlist-real-balance" style="font-size: 18px; font-weight: 750;">Rp 0</div>
+              </div>
+              <div>
+                <div class="stat-label">Potongan Simulasi</div>
+                <div class="stat-value" id="wishlist-total-price" style="font-size: 18px; font-weight: 750; color: var(--red);">Rp 0</div>
+              </div>
+              <div>
+                <div class="stat-label" id="wishlist-estimate-label">Total Saldo (Simulasi)</div>
+                <div class="stat-value" id="wishlist-simulated-balance" style="font-size: 18px; font-weight: 750; color: var(--text-primary);">Rp 0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title"><span class="card-title-dot" style="background:var(--brand)"></span> Daftar Simulasi Wishlist</span>
+            <button class="btn btn-primary" id="btn-add-wishlist" style="padding: 4px 10px; font-size: 11.5px;">Tambah Barang</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div id="wishlist-items-list" class="mini-list">
+              <!-- Dynamically populated -->
+            </div>
           </div>
         </div>
       </section>
@@ -462,6 +513,36 @@
       <div class="modal-foot">
         <button type="button" class="btn btn-ghost modal-close" data-modal="modal-budget">Batal</button>
         <button type="submit" class="btn btn-primary" id="bud-submit">Simpan Anggaran</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ MODAL: WISHLIST ═══ -->
+<div id="modal-wishlist" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Tambah Barang Wishlist</h3>
+      <button class="modal-close" data-modal="modal-wishlist">&times;</button>
+    </div>
+    <form id="form-wishlist">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nama Barang *</label>
+          <input type="text" id="wish-name" placeholder="Misal: Laptop, Sepeda, Sepatu..." required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Harga Barang (Rp) *</label>
+          <input type="number" id="wish-price" min="1" placeholder="0" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Link Barang (Opsional)</label>
+          <input type="text" id="wish-url" placeholder="https://tokopedia.link/... atau shopee.co.id/...">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost modal-close" data-modal="modal-wishlist">Batal</button>
+        <button type="submit" class="btn btn-primary" id="wish-submit">Simpan Barang</button>
       </div>
     </form>
   </div>
