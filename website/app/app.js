@@ -1439,8 +1439,9 @@ async function handleLogout() {
   }
 }
 
-// 15. DOM Content Loaded Bootstrapping
-document.addEventListener('DOMContentLoaded', () => {
+// 15. Safe Bootstrapping
+function bootstrap() {
+  console.log("Bootstrapping Financier Web App...");
   initTheme();
   
   // Theme Toggle Button Listeners
@@ -1461,4 +1462,11 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Check active user session on startup
   checkSession();
-});
+}
+
+// Run immediately if DOM is already loaded, otherwise wait for event
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrap);
+} else {
+  bootstrap();
+}
