@@ -559,7 +559,10 @@ function getLast6Months() {
 // ── Populate Selects ──
 function populateSelects() {
   // Account selects
-  const accOpts = ACCOUNTS.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+  const accOpts = ACCOUNTS.map(a => {
+    const bankInfo = a.bank_name ? ` (${a.bank_name})` : '';
+    return `<option value="${a.id}">${a.name}${bankInfo} - Saldo: ${idr(a.balance)}</option>`;
+  }).join('');
   $('tx-account').innerHTML   = '<option value="">Pilih rekening</option>' + accOpts;
   $('tx-to-account').innerHTML = '<option value="">Pilih tujuan</option>' + accOpts;
   $('filter-account') && ($('filter-account').innerHTML = '<option value="">Semua Rekening</option>' + accOpts);
