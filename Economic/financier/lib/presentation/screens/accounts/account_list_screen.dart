@@ -7,7 +7,7 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/account_repository.dart';
 import '../../../data/models/account.dart';
 
-final _accountListProvider =
+final accountListProvider =
     FutureProvider.autoDispose<List<Account>>((ref) async {
   final userId = ref.read(authRepositoryProvider).currentUser!.id;
   return ref.read(accountRepositoryProvider).getAll(userId);
@@ -19,7 +19,7 @@ class AccountListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final accounts = ref.watch(_accountListProvider);
+    final accounts = ref.watch(accountListProvider);
     final fmt = NumberFormat('#,###', 'id_ID');
     final totalBalance =
         accounts.whenOrNull(data: (a) => a.fold<double>(0, (s, a) => s + a.balance)) ?? 0;

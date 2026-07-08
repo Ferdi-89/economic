@@ -10,7 +10,7 @@ import '../../../data/models/transaction.dart';
 import '../../../data/models/category.dart';
 import '../../widgets/transaction_tile.dart';
 
-final _reportProvider = FutureProvider.autoDispose<ReportData>((ref) async {
+final reportProvider = FutureProvider.autoDispose<ReportData>((ref) async {
   final userId = ref.read(authRepositoryProvider).currentUser!.id;
   final txRepo = ref.read(transactionRepositoryProvider);
   final catRepo = ref.read(categoryRepositoryProvider);
@@ -67,7 +67,7 @@ class ReportScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final report = ref.watch(_reportProvider);
+    final report = ref.watch(reportProvider);
     final fmt = NumberFormat('#,###', 'id_ID');
 
     return Scaffold(
@@ -76,7 +76,7 @@ class ReportScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (d) => RefreshIndicator(
-          onRefresh: () => ref.refresh(_reportProvider.future),
+          onRefresh: () => ref.refresh(reportProvider.future),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -284,7 +284,10 @@ class ReportScreen extends ConsumerWidget {
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final tx = d.recentTransactions[index];
-                            return TransactionTile(transaction: tx);
+                             return TransactionTile(
+                               transaction: tx,
+                               onDeleteSuccess: () => ref.refresh(reportProvider.future),
+                             );
                           },
                         ),
                     ],

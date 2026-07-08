@@ -31,16 +31,88 @@ class TransactionRepository {
 
   Future<Transaction> create(Map<String, dynamic> data) async {
     final res = await _client.from('transactions').insert(data).select().single();
-    return Transaction.fromJson(res);
+    final tx = Transaction.fromJson(res);
+
+    // Apply new transaction balance effect
+    final double amount = tx.amount;
+    final String type = tx.type;
+    final String accountId = tx.accountId;
+    final String? toAccountId = tx.transferToAccountId;
+
+    if (type == 'income') {
+      await _adjustAccountBalance(accountId, amount);
+    } else if (type == 'expense') {
+      await _adjustAccountBalance(accountId, -amount);
+    } else if (type == 'transfer' && toAccountId != null) {
+      await _adjustAccountBalance(accountId, -amount);
+      await _adjustAccountBalance(toAccountId, amount);
+    }
+
+    return tx;
   }
 
   Future<Transaction> update(String id, Map<String, dynamic> data) async {
+    // 1. Get the old transaction details
+    final oldTx = await getById(id);
+
+    // 2. Revert old transaction balance effect
+    if (oldTx.type == 'income') {
+      await _adjustAccountBalance(oldTx.accountId, -oldTx.amount);
+    } else if (oldTx.type == 'expense') {
+      await _adjustAccountBalance(oldTx.accountId, oldTx.amount);
+    } else if (oldTx.type == 'transfer' && oldTx.transferToAccountId != null) {
+      await _adjustAccountBalance(oldTx.accountId, oldTx.amount);
+      await _adjustAccountBalance(oldTx.transferToAccountId!, -oldTx.amount);
+    }
+
+    // 3. Update the transaction
     final res = await _client.from('transactions').update(data).eq('id', id).select().single();
-    return Transaction.fromJson(res);
+    final tx = Transaction.fromJson(res);
+
+    // 4. Apply new transaction balance effect
+    final double amount = tx.amount;
+    final String type = tx.type;
+    final String accountId = tx.accountId;
+    final String? toAccountId = tx.transferToAccountId;
+
+    if (type == 'income') {
+      await _adjustAccountBalance(accountId, amount);
+    } else if (type == 'expense') {
+      await _adjustAccountBalance(accountId, -amount);
+    } else if (type == 'transfer' && toAccountId != null) {
+      await _adjustAccountBalance(accountId, -amount);
+      await _adjustAccountBalance(toAccountId, amount);
+    }
+
+    return tx;
   }
 
   Future<void> delete(String id) async {
+    // 1. Get the transaction details
+    final tx = await getById(id);
+
+    // 2. Revert transaction balance effect
+    if (tx.type == 'income') {
+      await _adjustAccountBalance(tx.accountId, -tx.amount);
+    } else if (tx.type == 'expense') {
+      await _adjustAccountBalance(tx.accountId, tx.amount);
+    } else if (tx.type == 'transfer' && tx.transferToAccountId != null) {
+      await _adjustAccountBalance(tx.accountId, tx.amount);
+      await _adjustAccountBalance(tx.transferToAccountId!, -tx.amount);
+    }
+
+    // 3. Delete the transaction
     await _client.from('transactions').delete().eq('id', id);
+  }
+
+  Future<void> _adjustAccountBalance(String accountId, double delta) async {
+    try {
+      final acc = await _client.from('accounts').select().eq('id', accountId).single();
+      final currentBalance = (acc['balance'] as num?)?.toDouble() ?? 0.0;
+      await _client.from('accounts').update({
+        'balance': currentBalance + delta,
+      }).eq('id', accountId);
+    } catch (_) {}
   }
 
   Future<double> getTotalIncome(String userId, DateTime start, DateTime end) async {

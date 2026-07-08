@@ -8,6 +8,11 @@ import '../../../data/repositories/account_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/models/category.dart';
 import '../../../data/models/account.dart';
+import '../dashboard/dashboard_screen.dart';
+import 'transaction_list_screen.dart';
+import '../reports/report_screen.dart';
+import '../accounts/account_list_screen.dart';
+import '../budgets/budget_list_screen.dart';
 
 final _formProvider =
     ChangeNotifierProvider.autoDispose.family<TransactionFormNotifier, String?>((ref, id) {
@@ -281,7 +286,12 @@ class TransactionFormScreen extends ConsumerWidget {
                         );
                         return;
                       }
-                      await form.submit();
+                       await form.submit();
+                       ref.invalidate(txListProvider);
+                       ref.invalidate(dashboardProvider);
+                       ref.invalidate(reportProvider);
+                       ref.invalidate(accountListProvider);
+                       ref.invalidate(budgetListProvider);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

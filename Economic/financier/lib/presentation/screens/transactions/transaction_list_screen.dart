@@ -9,7 +9,7 @@ import '../../../data/models/transaction.dart';
 import '../../../data/models/account.dart';
 import '../../widgets/transaction_tile.dart';
 
-final _txProvider =
+final txListProvider =
     FutureProvider.autoDispose.family<List<Transaction>, String>((ref, userId) async {
   return ref.read(transactionRepositoryProvider).getAll(userId, limit: 200);
 });
@@ -21,13 +21,13 @@ class TransactionListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final userId = ref.read(authRepositoryProvider).currentUser!.id;
-    final txAsync = ref.watch(_txProvider(userId));
+    final txAsync = ref.watch(txListProvider(userId));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Transaksi')),
       body: RefreshIndicator(
         onRefresh: () async =>
-            ref.refresh(_txProvider(userId).future),
+            ref.refresh(txListProvider(userId).future),
         child: txAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Error: $e')),
@@ -70,7 +70,10 @@ class TransactionListScreen extends ConsumerWidget {
                                   color: theme
                                       .colorScheme.onSurfaceVariant))),
                       ...dayTxs.map(
-                          (tx) => TransactionTile(transaction: tx)),
+                          (tx) => TransactionTile(
+                            transaction: tx,
+                            onDeleteSuccess: () => ref.refresh(txListProvider(userId).future),
+                          )),
                       const SizedBox(height: 8),
                     ]);
               },

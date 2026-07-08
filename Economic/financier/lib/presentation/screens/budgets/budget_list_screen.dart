@@ -6,7 +6,7 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/budget_repository.dart';
 import '../../../data/models/budget.dart';
 
-final _budgetListProvider =
+final budgetListProvider =
     FutureProvider.autoDispose<List<Budget>>((ref) async {
   final userId = ref.read(authRepositoryProvider).currentUser!.id;
   return ref.read(budgetRepositoryProvider).getAll(userId);
@@ -18,7 +18,7 @@ class BudgetListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final budgets = ref.watch(_budgetListProvider);
+    final budgets = ref.watch(budgetListProvider);
     final fmt = NumberFormat('#,###', 'id_ID');
 
     return Scaffold(
@@ -163,7 +163,7 @@ class BudgetListScreen extends ConsumerWidget {
                         'period': 'monthly',
                       });
                       if (dCtx.mounted) Navigator.pop(dCtx);
-                      ref.invalidate(_budgetListProvider);
+                      ref.invalidate(budgetListProvider);
                     },
                     child: const Text('Simpan')),
               ],

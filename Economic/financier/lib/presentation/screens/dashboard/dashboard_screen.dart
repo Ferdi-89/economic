@@ -21,7 +21,7 @@ import '../../../data/repositories/new_features_repository.dart';
 import '../../widgets/transaction_tile.dart';
 import 'wishlist_provider.dart';
 
-final _dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
+final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
   final userId = ref.read(authRepositoryProvider).currentUser!.id;
   final txRepo = ref.read(transactionRepositoryProvider);
   final accRepo = ref.read(accountRepositoryProvider);
@@ -82,7 +82,7 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final data = ref.watch(_dashboardProvider);
+    final data = ref.watch(dashboardProvider);
     final wishlist = ref.watch(wishlistProvider);
     final isSimulationActive = ref.watch(wishlistSimulationActiveProvider);
 
@@ -96,7 +96,7 @@ class DashboardScreen extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Halo, Selamat Datang! \u{1F44B}', 
+            Text('Halo, Selamat Datang!', 
                  style: theme.textTheme.titleMedium?.copyWith(
                      fontWeight: FontWeight.bold,
                      color: theme.colorScheme.onSurface)),
@@ -132,7 +132,7 @@ class DashboardScreen extends ConsumerWidget {
         loading: () => _buildLoading(),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (d) => RefreshIndicator(
-          onRefresh: () => ref.refresh(_dashboardProvider.future),
+          onRefresh: () => ref.refresh(dashboardProvider.future),
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
@@ -172,7 +172,10 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 )
               else
-                ...d.recentTransactions.map((tx) => TransactionTile(transaction: tx)),
+                ...d.recentTransactions.map((tx) => TransactionTile(
+                  transaction: tx,
+                  onDeleteSuccess: () => ref.refresh(dashboardProvider.future),
+                )),
               const SizedBox(height: 20),
               _buildAccountsRow(context, d, ref, isSimulationActive, simulatedDeduction),
               const SizedBox(height: 20),
