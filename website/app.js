@@ -1,1504 +1,721 @@
-// ════════ FINANCIER APP JAVASCRIPT ════════
+/* ═══════════════════════════════════════
+   FINANCIER — APP.JS
+   Scripts run via `defer` → DOM is ready
+   AND all CDN libs are loaded when this runs.
+   No DOMContentLoaded needed.
+═══════════════════════════════════════ */
 
-// 0. Global Error Logger for Debugging
-window.onerror = function(message, source, lineno, colno, error) {
-  console.error("Global Error Caught:", message, "at", source, ":", lineno);
-  
-  // Create a visible error message box on top of the page
-  const errorBox = document.createElement('div');
-  errorBox.id = 'debug-error-box';
-  errorBox.style.position = 'fixed';
-  errorBox.style.inset = '20px';
-  errorBox.style.background = '#1a1a24';
-  errorBox.style.border = '2px solid #ef4444';
-  errorBox.style.color = '#fca5a5';
-  errorBox.style.padding = '24px';
-  errorBox.style.borderRadius = '16px';
-  errorBox.style.zIndex = '999999';
-  errorBox.style.fontFamily = 'monospace';
-  errorBox.style.fontSize = '14px';
-  errorBox.style.overflow = 'auto';
-  errorBox.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.5)';
-  
-  errorBox.innerHTML = `
-    <h3 style="color: #ef4444; margin-bottom: 12px; font-weight: bold;">Aplikasi Crash (Error terdeteksi)</h3>
-    <p style="margin-bottom: 8px;"><strong>Pesan:</strong> ${message}</p>
-    <p style="margin-bottom: 8px;"><strong>Lokasi:</strong> ${source}:${lineno}:${colno}</p>
-    <pre style="background: #09090b; padding: 12px; border-radius: 8px; color: #a1a1aa; margin-top: 12px; white-space: pre-wrap; font-size: 12px;">${error ? error.stack : 'No stack trace available'}</pre>
-    <button onclick="document.getElementById('debug-error-box').remove()" style="margin-top: 16px; padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Tutup</button>
-  `;
-  
-  document.body.appendChild(errorBox);
-  
-  // Force hide the loader so the error box is visible
-  const loader = document.getElementById('global-loader');
-  if (loader) loader.classList.add('hidden');
-  
-  return false;
-};
+// ── Config ──
+const SUPABASE_URL  = 'https://mgyohqvbcpripmkgipvs.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_p0NuPgDrOUq8quIw1PFflg__T3UXHhz';
 
-// 0b. Global Unhandled Promise Rejection Catcher
-window.addEventListener('unhandledrejection', function(event) {
-  console.error('Unhandled Promise Rejection:', event.reason);
-  const loader = document.getElementById('global-loader');
-  if (loader) loader.classList.add('hidden');
-  const authContainer = document.getElementById('auth-container');
-  if (authContainer) authContainer.classList.remove('hidden');
+// ── Init Supabase ──
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── State ──
+let USER       = null;
+let ACCOUNTS   = [];
+let CATEGORIES = [];
+let TRANSACTIONS = [];
+let BUDGETS    = [];
+let BUDGET_ITEMS = [];
+let chartBar   = null;
+let chartPie   = null;
+let currentTab = 'dashboard';
+let txFilter   = { q: '', type: '', month: '' };
+
+// ── Helpers ──
+const $ = id => document.getElementById(id);
+const idr = n => new Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', minimumFractionDigits:0, maximumFractionDigits:0 }).format(n || 0);
+const today = () => new Date().toISOString().split('T')[0];
+const monthNow = () => new Date().toISOString().slice(0,7);
+
+function showLoader()  { $('loader').classList.remove('hidden'); }
+function hideLoader()  { $('loader').classList.add('hidden'); }
+function show(id)      { $(id).classList.remove('hidden'); }
+function hide(id)      { $(id).classList.add('hidden'); }
+function openModal(id) { show(id); }
+function closeModal(id){ hide(id); }
+
+// ── Auth state listener ──
+sb.auth.onAuthStateChange((_event, session) => {
+  if (session?.user) {
+    USER = session.user;
+    showApp();
+  } else {
+    USER = null;
+    showAuthScreen();
+  }
 });
 
-// 1. Supabase Initialization (done at top-level so supabase is available globally)
-const SUPABASE_URL = 'https://mgyohqvbcpripmkgipvs.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_p0NuPgDrOUq8quIw1PFflg__T3UXHhz';
-
-let supabase;
-try {
-  if (!window.supabase) throw new Error('Supabase CDN tidak termuat. Periksa koneksi atau adblocker.');
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch(e) {
-  // Show error immediately even if DOM is not ready
-  document.addEventListener('DOMContentLoaded', () => {
-    const loader = document.getElementById('global-loader');
-    if (loader) loader.classList.add('hidden');
-    alert('Error inisialisasi: ' + e.message);
-  });
+// ── Show auth / app ──
+function showAuthScreen() {
+  hideLoader();
+  hide('app');
+  show('auth-screen');
 }
 
-// 2. Global State Variables
-let currentUser = null;
-let currentProfile = null;
-let userAccounts = [];
-let userCategories = [];
-let userTransactions = [];
-let userBudgets = [];
-let userBudgetItems = [];
-
-// Chart instances
-let incomeExpenseChart = null;
-let categoryChart = null;
-
-// UI State
-let isSignUpMode = false;
-let currentTab = 'overview';
-
-// 3. Helper Functions
-function showElement(id) {
-  document.getElementById(id).classList.remove('hidden');
-}
-
-function hideElement(id) {
-  document.getElementById(id).classList.add('hidden');
-}
-
-function showLoader() {
-  showElement('global-loader');
-}
-
-function hideLoader() {
-  hideElement('global-loader');
-}
-
-// Format Currency to IDR (Rupiah)
-function formatIDR(amount) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
-}
-
-// Format date to local Indonesian format
-function formatDate(dateString) {
-  const options = { day: 'numeric', month: 'short', year: 'numeric' };
-  return new Date(dateString).toLocaleDateString('id-ID', options);
-}
-
-// 4. Initial Theme Setup & Theme Switcher
-function initTheme() {
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  updateThemeIcons(savedTheme);
-}
-
-function toggleTheme() {
-  const currentTheme = document.documentElement.getAttribute('data-theme');
-  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', newTheme);
-  localStorage.setItem('theme', newTheme);
-  updateThemeIcons(newTheme);
-}
-
-function updateThemeIcons(theme) {
-  const themeToggles = [
-    document.getElementById('theme-toggle'),
-    document.getElementById('mobile-theme-toggle')
-  ];
-  themeToggles.forEach(toggle => {
-    if (!toggle) return;
-    if (theme === 'light') {
-      toggle.querySelector('.sun-icon')?.classList.add('hidden');
-      toggle.querySelector('.moon-icon')?.classList.remove('hidden');
-    } else {
-      toggle.querySelector('.sun-icon')?.classList.remove('hidden');
-      toggle.querySelector('.moon-icon')?.classList.add('hidden');
-    }
-  });
-}
-
-// 5. Auth Functions
-async function checkSession() {
+async function showApp() {
   showLoader();
+  hide('auth-screen');
+  show('app');
+  updateUserUI();
+  await loadAll();
+  hideLoader();
+  renderAll();
+  if (window.lucide) lucide.createIcons();
+}
+
+function updateUserUI() {
+  const name  = USER?.user_metadata?.full_name || USER?.email?.split('@')[0] || 'U';
+  const email = USER?.email || '';
+  const init  = name.charAt(0).toUpperCase();
+  $('sidebar-avatar').textContent = init;
+  $('sidebar-name').textContent   = name;
+  $('sidebar-email').textContent  = email;
+}
+
+// ── Data loading ──
+async function loadAll() {
   try {
-    // Race between getSession and an 8 second timeout
-    const sessionResult = await Promise.race([
-      supabase.auth.getSession(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('TIMEOUT: Koneksi ke server Supabase terlalu lama (>8 detik)')), 8000)
-      )
-    ]);
-
-    const { data: { session }, error } = sessionResult;
-
-    if (session && session.user) {
-      currentUser = session.user;
-      await loadUserProfile();
-      hideElement('auth-container');
-      showElement('app-container');
-      await initApp();
-    } else {
-      currentUser = null;
-      currentProfile = null;
-      hideElement('app-container');
-      showElement('auth-container');
-      toggleAuthMode(false);
-    }
-  } catch (err) {
-    console.error('Pemeriksaan sesi gagal:', err);
-    currentUser = null;
-    currentProfile = null;
-    hideElement('app-container');
-    showElement('auth-container');
-    toggleAuthMode(false);
-  } finally {
-    hideLoader();
+    await Promise.all([fetchAccounts(), fetchCategories(), fetchTransactions(), fetchBudgets()]);
+  } catch (e) {
+    console.error('loadAll error:', e);
   }
 }
 
-
-async function loadUserProfile() {
-  if (!currentUser) return;
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', currentUser.id)
-      .single();
-    
-    if (data) {
-      currentProfile = data;
-      // Update sidebar details
-      const initial = (data.full_name || currentUser.email || 'U').charAt(0).toUpperCase();
-      document.getElementById('user-avatar-initial').innerText = initial;
-      document.getElementById('mobile-user-avatar').innerText = initial;
-      
-      document.getElementById('user-display-name').innerText = data.full_name || 'Pengguna';
-      document.getElementById('mobile-user-name').innerText = data.full_name || 'Pengguna';
-      
-      document.getElementById('user-display-email').innerText = currentUser.email;
-      document.getElementById('mobile-user-email').innerText = currentUser.email;
-    }
-  } catch (err) {
-    console.error('Gagal memuat profil pengguna:', err);
-  }
-}
-
-function toggleAuthMode(signUpMode) {
-  isSignUpMode = signUpMode;
-  const nameGroup = document.getElementById('name-group');
-  const authTitle = document.getElementById('auth-title');
-  const authSubtitle = document.getElementById('auth-subtitle');
-  const submitBtn = document.getElementById('auth-submit-btn').querySelector('span');
-  const toggleText = document.getElementById('auth-toggle-text');
-  
-  if (isSignUpMode) {
-    showElement('name-group');
-    document.getElementById('auth-name').required = true;
-    authTitle.innerText = 'Buat Akun Baru';
-    authSubtitle.innerText = 'Mulai kelola keuangan Anda hari ini';
-    submitBtn.innerText = 'Daftar';
-    toggleText.innerHTML = 'Sudah punya akun? <a href="#" id="auth-toggle-btn">Masuk di sini</a>';
-  } else {
-    hideElement('name-group');
-    document.getElementById('auth-name').required = false;
-    authTitle.innerText = 'Masuk ke Akun Anda';
-    authSubtitle.innerText = 'Kelola keuangan Anda secara realtime';
-    submitBtn.innerText = 'Masuk';
-    toggleText.innerHTML = 'Belum punya akun? <a href="#" id="auth-toggle-btn">Daftar sekarang</a>';
-  }
-  
-  // Re-attach toggle listener
-  document.getElementById('auth-toggle-btn').addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleAuthMode(!isSignUpMode);
-  });
-}
-
-// 6. Navigation Tabs
-function initNavigation() {
-  const navLinks = document.querySelectorAll('.nav-link, .mobile-nav-link');
-  navLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      const tabName = link.getAttribute('data-tab');
-      if (tabName) {
-        switchTab(tabName);
-      }
-    });
-  });
-  
-  // Handle card shortcut clicks (Lihat Semua)
-  document.querySelectorAll('[data-tab-go]').forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      const tabName = link.getAttribute('data-tab-go');
-      switchTab(tabName);
-    });
-  });
-}
-
-function switchTab(tabName) {
-  currentTab = tabName;
-  
-  // Update sidebar and mobile nav active classes
-  document.querySelectorAll('.nav-link, .mobile-nav-link').forEach(link => {
-    if (link.getAttribute('data-tab') === tabName) {
-      link.classList.add('active');
-    } else {
-      link.classList.remove('active');
-    }
-  });
-  
-  // Hide all panels
-  document.querySelectorAll('.view-panel').forEach(panel => {
-    panel.classList.add('hidden');
-  });
-  
-  // Show active panel
-  const activePanel = document.getElementById(`panel-${tabName}`);
-  if (activePanel) {
-    activePanel.classList.remove('hidden');
-  }
-  
-  // Update Header Title
-  const titleMap = {
-    overview: 'Dashboard',
-    transactions: 'Daftar Transaksi',
-    accounts: 'Daftar Rekening',
-    budgets: 'Anggaran Bulanan',
-    reports: 'Laporan Keuangan'
-  };
-  const subtitleMap = {
-    overview: 'Ringkasan kondisi keuangan Anda',
-    transactions: 'Melacak seluruh riwayat pengeluaran dan pemasukan',
-    accounts: 'Kelola semua rekening, bank, dan dompet digital',
-    budgets: 'Atur batas pengeluaran bulanan per kategori',
-    reports: 'Analisis visual tren pemasukan dan pengeluaran Anda'
-  };
-  
-  document.getElementById('page-title').innerText = titleMap[tabName] || 'Financier';
-  document.getElementById('page-subtitle').innerText = subtitleMap[tabName] || '';
-  
-  // Trigger tab-specific loaders
-  if (tabName === 'reports') {
-    renderCharts();
-  }
-}
-
-// 7. Core Application Logic & Database operations
-async function initApp() {
-  showLoader();
-  try {
-    await Promise.all([
-      fetchAccounts(),
-      fetchCategories(),
-      fetchTransactions(),
-      fetchBudgets()
-    ]);
-    
-    // Render initial views
-    renderOverview();
-    renderTransactionsList();
-    renderAccountsList();
-    renderBudgetsList();
-    
-    // Populate form dropdown selects
-    populateSelectOptions();
-    
-  } catch (err) {
-    console.error('Gagal mengambil data dari database:', err);
-    alert('Terjadi kesalahan saat memuat data. Silakan refresh halaman.');
-  } finally {
-    hideLoader();
-  }
-}
-
-// Database Fetchers
 async function fetchAccounts() {
-  const { data, error } = await supabase
-    .from('accounts')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .eq('is_active', true)
-    .order('created_at');
-    
-  if (error) throw error;
-  userAccounts = data || [];
+  const { data, error } = await sb.from('accounts').select('*').eq('user_id', USER.id).eq('is_active', true).order('created_at');
+  if (!error) ACCOUNTS = data || [];
 }
-
 async function fetchCategories() {
-  const { data, error } = await supabase
-    .from('categories')
-    .select('*')
-    .or(`user_id.eq.${currentUser.id},is_default.eq.true`)
-    .eq('is_active', true)
-    .order('sort_order');
-    
-  if (error) throw error;
-  userCategories = data || [];
+  const { data, error } = await sb.from('categories').select('*').or(`user_id.eq.${USER.id},is_default.eq.true`).eq('is_active', true).order('sort_order');
+  if (!error) CATEGORIES = data || [];
 }
-
 async function fetchTransactions() {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .order('date', { ascending: false });
-    
-  if (error) throw error;
-  userTransactions = data || [];
+  const { data, error } = await sb.from('transactions').select('*').eq('user_id', USER.id).order('date', { ascending: false }).order('created_at', { ascending: false }).limit(200);
+  if (!error) TRANSACTIONS = data || [];
 }
-
 async function fetchBudgets() {
-  const { data: budgetsData, error: budgetsErr } = await supabase
-    .from('budgets')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .eq('is_active', true);
-    
-  if (budgetsErr) throw budgetsErr;
-  userBudgets = budgetsData || [];
-  
-  if (userBudgets.length > 0) {
-    const budgetIds = userBudgets.map(b => b.id);
-    const { data: itemsData, error: itemsErr } = await supabase
-      .from('budget_items')
-      .select('*')
-      .in('budget_id', budgetIds);
-      
-    if (itemsErr) throw itemsErr;
-    userBudgetItems = itemsData || [];
-  } else {
-    userBudgetItems = [];
+  const { data: budgets, error: e1 } = await sb.from('budgets').select('*').eq('user_id', USER.id).eq('is_active', true);
+  if (!e1) BUDGETS = budgets || [];
+  if (BUDGETS.length) {
+    const ids = BUDGETS.map(b => b.id);
+    const { data: items, error: e2 } = await sb.from('budget_items').select('*').in('budget_id', ids);
+    if (!e2) BUDGET_ITEMS = items || [];
   }
 }
 
-// 8. View Renderers
-
-// 8a. Dashboard (Overview)
-function renderOverview() {
-  // 1. Calculate Total Balance
-  const totalBalance = userAccounts.reduce((sum, acc) => sum + parseFloat(acc.balance), 0);
-  document.getElementById('dash-total-balance').innerText = formatIDR(totalBalance);
-  document.getElementById('dash-active-accounts-count').innerText = `${userAccounts.length} Rekening Aktif`;
-  
-  // 2. Calculate Monthly Income & Expenses (Current calendar month)
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  
-  const monthlyTxs = userTransactions.filter(t => {
-    const txDate = new Date(t.date);
-    return txDate >= startOfMonth && txDate <= endOfMonth;
-  });
-  
-  const monthlyIncome = monthlyTxs
-    .filter(t => t.type === 'income' && t.status === 'completed')
-    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    
-  const monthlyExpense = monthlyTxs
-    .filter(t => t.type === 'expense' && t.status === 'completed')
-    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    
-  document.getElementById('dash-monthly-income').innerText = formatIDR(monthlyIncome);
-  document.getElementById('dash-monthly-expense').innerText = formatIDR(monthlyExpense);
-  
-  // 3. Render Accounts Summary
-  const dashAccountsContainer = document.getElementById('dash-accounts-list');
-  dashAccountsContainer.innerHTML = '';
-  
-  if (userAccounts.length === 0) {
-    dashAccountsContainer.innerHTML = `
-      <div class="empty-state">
-        <i data-lucide="credit-card"></i>
-        <p>Belum ada rekening dibuat</p>
-      </div>`;
-  } else {
-    // Show top 3 accounts in Dashboard
-    userAccounts.slice(0, 3).forEach(acc => {
-      const icon = acc.type === 'bank' ? 'landmark' : 'wallet';
-      const item = document.createElement('div');
-      item.className = 'account-item-mini';
-      item.innerHTML = `
-        <div class="account-info-left">
-          <div class="account-icon-badge" style="color: ${acc.color || 'var(--primary)'}; background-color: ${acc.color}15">
-            <i data-lucide="${icon}"></i>
-          </div>
-          <div class="account-details-mini">
-            <span class="account-name-mini">${acc.name}</span>
-            <span class="account-type-mini">${acc.type}</span>
-          </div>
-        </div>
-        <span class="account-balance-mini">${formatIDR(acc.balance)}</span>
-      `;
-      dashAccountsContainer.appendChild(item);
-    });
-  }
-  
-  // 4. Render Budgets Progress
-  const dashBudgetsContainer = document.getElementById('dash-budgets-list');
-  dashBudgetsContainer.innerHTML = '';
-  
-  if (userBudgets.length === 0) {
-    dashBudgetsContainer.innerHTML = `
-      <div class="empty-state">
-        <i data-lucide="pie-chart"></i>
-        <p>Belum ada anggaran aktif</p>
-      </div>`;
-  } else {
-    // Show top 2 budgets in Dashboard
-    userBudgets.slice(0, 2).forEach(b => {
-      const budgetItems = userBudgetItems.filter(item => item.budget_id === b.id);
-      const budgetCatIds = budgetItems.map(item => item.category_id);
-      
-      // Calculate Spent for this budget categories
-      const budgetSpent = monthlyTxs
-        .filter(t => t.type === 'expense' && t.status === 'completed' && budgetCatIds.includes(t.category_id))
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-        
-      const percentage = Math.min(Math.round((budgetSpent / b.amount) * 100), 100);
-      const color = b.color || 'var(--primary)';
-      
-      const item = document.createElement('div');
-      item.className = 'budget-item-card';
-      item.innerHTML = `
-        <div class="budget-header-mini">
-          <span>${b.name}</span>
-          <span>${percentage}%</span>
-        </div>
-        <div class="budget-progress-bar-bg">
-          <div class="budget-progress-bar-fill" style="width: ${percentage}%; background-color: ${color}"></div>
-        </div>
-        <div class="budget-meta-mini">
-          <span>Sisa: ${formatIDR(Math.max(0, b.amount - budgetSpent))}</span>
-          <span>Target: ${formatIDR(b.amount)}</span>
-        </div>
-      `;
-      dashBudgetsContainer.appendChild(item);
-    });
-  }
-  
-  // 5. Render Recent Transactions Table
-  const tableBody = document.getElementById('dash-transactions-body');
-  const emptyPlaceholder = document.getElementById('dash-transactions-empty');
-  tableBody.innerHTML = '';
-  
-  if (userTransactions.length === 0) {
-    emptyPlaceholder.classList.remove('hidden');
-    document.getElementById('dash-transactions-table').classList.add('hidden');
-  } else {
-    emptyPlaceholder.classList.add('hidden');
-    document.getElementById('dash-transactions-table').classList.remove('hidden');
-    
-    const accountMap = new Map(userAccounts.map(a => [a.id, a]));
-    const categoryMap = new Map(userCategories.map(c => [c.id, c]));
-    
-    // Show top 5 recent transactions
-    userTransactions.slice(0, 5).forEach(t => {
-      const accName = accountMap.get(t.account_id)?.name || 'Rekening';
-      const cat = categoryMap.get(t.category_id);
-      const catName = cat?.name || (t.type === 'transfer' ? 'Transfer Saldo' : 'Lainnya');
-      
-      let amountClass = 'color-expense';
-      let icon = 'arrow-up-right';
-      let prefix = '-';
-      let rowBg = 'background-danger';
-      
-      if (t.type === 'income') {
-        amountClass = 'color-income';
-        icon = 'arrow-down-left';
-        prefix = '+';
-        rowBg = 'background-success';
-      } else if (t.type === 'transfer') {
-        amountClass = 'color-transfer';
-        icon = 'repeat';
-        prefix = '';
-        rowBg = 'background-transfer';
-      }
-      
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>
-          <div class="table-tx-info">
-            <div class="table-tx-icon ${rowBg} ${amountClass}">
-              <i data-lucide="${icon}"></i>
-            </div>
-            <div class="table-tx-details">
-              <span class="table-tx-note">${t.note || catName}</span>
-              <span class="table-tx-type-badge">${t.type}</span>
-            </div>
-          </div>
-        </td>
-        <td>${catName}</td>
-        <td>${accName}</td>
-        <td>${formatDate(t.date)}</td>
-        <td class="text-right table-amount ${amountClass}">${prefix}${formatIDR(t.amount)}</td>
-        <td class="text-right">
-          <button class="btn-delete-tx" onclick="deleteTransaction('${t.id}')" title="Hapus Transaksi">
-            <i data-lucide="trash-2"></i>
-          </button>
-        </td>
-      `;
-      tableBody.appendChild(row);
-    });
-  }
-  
-  lucide.createIcons();
+// ── Render all ──
+function renderAll() {
+  renderDashboard();
+  renderTransactions();
+  renderAccounts();
+  renderBudgets();
+  renderReports();
+  populateSelects();
 }
 
-// 8b. Transactions List Panel
-function renderTransactionsList() {
-  const tableBody = document.getElementById('transactions-list-body');
-  const emptyPlaceholder = document.getElementById('transactions-list-empty');
-  tableBody.innerHTML = '';
-  
-  // Apply Filter Logic
-  const searchQuery = document.getElementById('filter-search').value.toLowerCase();
-  const filterType = document.getElementById('filter-type').value;
-  const filterAcc = document.getElementById('filter-account').value;
-  const filterCat = document.getElementById('filter-category').value;
-  const startDate = document.getElementById('filter-start-date').value;
-  const endDate = document.getElementById('filter-end-date').value;
-  
-  const filteredTxs = userTransactions.filter(t => {
-    const matchesSearch = !searchQuery || (t.note && t.note.toLowerCase().includes(searchQuery));
-    const matchesType = !filterType || t.type === filterType;
-    const matchesAcc = !filterAcc || t.account_id === filterAcc || t.transfer_to_account_id === filterAcc;
-    const matchesCat = !filterCat || t.category_id === filterCat;
-    
-    let matchesDate = true;
-    if (startDate) {
-      matchesDate = matchesDate && new Date(t.date) >= new Date(startDate);
-    }
-    if (endDate) {
-      matchesDate = matchesDate && new Date(t.date) <= new Date(endDate);
-    }
-    
-    return matchesSearch && matchesType && matchesAcc && matchesCat && matchesDate;
-  });
-  
-  if (filteredTxs.length === 0) {
-    emptyPlaceholder.classList.remove('hidden');
+// ── Dashboard ──
+function renderDashboard() {
+  const totalBalance = ACCOUNTS.reduce((s, a) => s + (a.balance || 0), 0);
+  const now = monthNow();
+  const monthTx = TRANSACTIONS.filter(t => t.date?.startsWith(now));
+  const income   = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
+  const expense  = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+
+  $('stat-balance').textContent = idr(totalBalance);
+  $('stat-accounts-count').textContent = `${ACCOUNTS.length} rekening aktif`;
+  $('stat-income').textContent  = idr(income);
+  $('stat-expense').textContent = idr(expense);
+
+  // Accounts mini list
+  const accEl = $('dash-accounts');
+  if (!ACCOUNTS.length) {
+    accEl.innerHTML = '<div class="empty-msg">Belum ada rekening</div>';
   } else {
-    emptyPlaceholder.classList.add('hidden');
-    
-    const accountMap = new Map(userAccounts.map(a => [a.id, a]));
-    const categoryMap = new Map(userCategories.map(c => [c.id, c]));
-    
-    filteredTxs.forEach(t => {
-      const acc = accountMap.get(t.account_id);
-      const accName = acc ? acc.name : 'Rekening';
-      const cat = categoryMap.get(t.category_id);
-      const catName = cat?.name || (t.type === 'transfer' ? 'Transfer Saldo' : 'Lainnya');
-      
-      let amountClass = 'color-expense';
-      let icon = 'arrow-up-right';
-      let prefix = '-';
-      let rowBg = 'background-danger';
-      
-      if (t.type === 'income') {
-        amountClass = 'color-income';
-        icon = 'arrow-down-left';
-        prefix = '+';
-        rowBg = 'background-success';
-      } else if (t.type === 'transfer') {
-        amountClass = 'color-transfer';
-        icon = 'repeat';
-        prefix = '';
-        rowBg = 'background-transfer';
-      }
-      
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>
-          <div class="table-tx-info">
-            <div class="table-tx-icon ${rowBg} ${amountClass}">
-              <i data-lucide="${icon}"></i>
-            </div>
-            <div class="table-tx-details">
-              <span class="table-tx-note">${t.note || catName}</span>
-              <span class="table-tx-type-badge">${t.type}</span>
-            </div>
-          </div>
-        </td>
-        <td>${catName}</td>
-        <td>${accName} ${t.type === 'transfer' ? `→ ${accountMap.get(t.transfer_to_account_id)?.name || ''}` : ''}</td>
-        <td>${formatDate(t.date)}</td>
-        <td class="text-right table-amount ${amountClass}">${prefix}${formatIDR(t.amount)}</td>
-        <td class="text-center">
-          <button class="btn-delete-tx" onclick="deleteTransaction('${t.id}')" title="Hapus Transaksi">
-            <i data-lucide="trash-2"></i>
-          </button>
-        </td>
-      `;
-      tableBody.appendChild(row);
-    });
+    accEl.innerHTML = ACCOUNTS.slice(0,5).map(a => `
+      <div class="list-item">
+        <div class="list-icon" style="background:${a.color || '#0ea5e9'}22; font-size:.9rem;">💳</div>
+        <div class="list-main">
+          <div class="list-title">${a.name}</div>
+          <div class="list-sub">${accountTypeLabel(a.account_type)}</div>
+        </div>
+        <div class="list-amount">${idr(a.balance)}</div>
+      </div>`).join('');
   }
-  
-  lucide.createIcons();
-}
 
-// 8c. Accounts Panel
-function renderAccountsList() {
-  const accountsGrid = document.getElementById('accounts-grid');
-  const emptyState = document.getElementById('accounts-empty');
-  accountsGrid.innerHTML = '';
-  
-  if (userAccounts.length === 0) {
-    emptyState.classList.remove('hidden');
-    accountsGrid.classList.add('hidden');
+  // Recent tx
+  const txEl = $('dash-transactions');
+  if (!TRANSACTIONS.length) {
+    txEl.innerHTML = '<div class="empty-msg">Belum ada transaksi</div>';
   } else {
-    emptyState.classList.add('hidden');
-    accountsGrid.classList.remove('hidden');
-    
-    userAccounts.forEach(acc => {
-      const themeColor = acc.color || '#00668A';
-      const icon = acc.type === 'bank' ? 'landmark' : 'wallet';
-      
-      const card = document.createElement('div');
-      card.className = 'account-card-premium';
-      card.style = `--account-theme: ${themeColor}; --account-theme-glow: ${themeColor}20`;
-      card.innerHTML = `
-        <div class="acc-card-header">
-          <div class="acc-card-details">
-            <h3 class="acc-card-name">${acc.name}</h3>
-            <span class="acc-card-number">${acc.bank_name || ''} ${acc.account_number ? `(${acc.account_number})` : ''}</span>
-          </div>
-          <div class="acc-card-icon">
-            <i data-lucide="${icon}"></i>
-          </div>
-        </div>
-        <div class="acc-card-footer">
-          <div>
-            <span class="acc-card-balance-label">Saldo Saat Ini</span>
-            <div class="acc-card-balance">${formatIDR(acc.balance)}</div>
-          </div>
-          <button class="btn-archive-account" onclick="deleteAccount('${acc.id}', '${acc.name}')" title="Arsipkan / Hapus Rekening">
-            <i data-lucide="trash-2"></i>
-          </button>
-        </div>
-      `;
-      accountsGrid.appendChild(card);
-    });
+    txEl.innerHTML = TRANSACTIONS.slice(0,5).map(t => txItemHTML(t)).join('');
   }
-  lucide.createIcons();
 }
 
-// 8d. Budgets Panel
-function renderBudgetsList() {
-  const budgetsGrid = document.getElementById('budgets-grid');
-  const emptyState = document.getElementById('budgets-empty');
-  budgetsGrid.innerHTML = '';
-  
-  if (userBudgets.length === 0) {
-    emptyState.classList.remove('hidden');
-    budgetsGrid.classList.add('hidden');
-  } else {
-    emptyState.classList.add('hidden');
-    budgetsGrid.classList.remove('hidden');
-    
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    const monthlyExpenses = userTransactions.filter(t => {
-      const txDate = new Date(t.date);
-      return t.type === 'expense' && t.status === 'completed' && txDate >= startOfMonth && txDate <= endOfMonth;
-    });
-    
-    userBudgets.forEach(b => {
-      const budgetItems = userBudgetItems.filter(item => item.budget_id === b.id);
-      const budgetCatIds = budgetItems.map(item => item.category_id);
-      
-      const spent = monthlyExpenses
-        .filter(t => budgetCatIds.includes(t.category_id))
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-        
-      const percentage = Math.round((spent / b.amount) * 100);
-      const color = b.color || '#10B981';
-      
-      let statusClass = 'status-safe';
-      let statusText = 'Aman';
-      
-      if (percentage >= 100) {
-        statusClass = 'status-over';
-        statusText = 'Over Budget';
-      } else if (percentage >= 80) {
-        statusClass = 'status-warning';
-        statusText = 'Mendekati Batas';
-      }
-      
-      const card = document.createElement('div');
-      card.className = 'budget-card-premium';
-      card.innerHTML = `
-        <div class="budget-card-header">
-          <h3 class="budget-card-title">${b.name}</h3>
-          <span class="budget-card-status-badge ${statusClass}">${statusText}</span>
-        </div>
-        
-        <div class="budget-progress-bar-bg" style="height: 12px; border-radius: 6px;">
-          <div class="budget-progress-bar-fill" style="width: ${Math.min(percentage, 100)}%; background-color: ${color}; border-radius: 6px;"></div>
-        </div>
-        
-        <div class="budget-card-limit-row">
-          <span>Terpakai: <strong class="color-expense">${formatIDR(spent)}</strong> (${percentage}%)</span>
-          <span>Batas: <strong class="budget-card-limit-val">${formatIDR(b.amount)}</strong></span>
-        </div>
-        
-        <div style="margin-top: auto; padding-top: 16px; display: flex; justify-content: space-between; align-items: center;">
-          <span class="text-muted" style="font-size: 0.75rem;">Periode: Bulanan (${now.toLocaleString('id-ID', { month: 'long' })})</span>
-          <button class="btn-delete-tx" onclick="deleteBudget('${b.id}')" title="Hapus Anggaran"><i data-lucide="trash-2"></i></button>
-        </div>
-      `;
-      budgetsGrid.appendChild(card);
-    });
-  }
-  lucide.createIcons();
-}
+// ── Transactions ──
+function renderTransactions() {
+  let list = [...TRANSACTIONS];
+  if (txFilter.q)    list = list.filter(t => (t.notes||'').toLowerCase().includes(txFilter.q.toLowerCase()));
+  if (txFilter.type) list = list.filter(t => t.type === txFilter.type);
+  if (txFilter.month) list = list.filter(t => t.date?.startsWith(txFilter.month));
 
-// 8e. Reports & Charts (ChartJS)
-function renderCharts() {
-  if (userTransactions.length === 0) return;
-  
-  const ctxBar = document.getElementById('chart-income-expense').getContext('2d');
-  const ctxPie = document.getElementById('chart-category-breakdown').getContext('2d');
-  
-  // Destroy old charts if exist
-  if (incomeExpenseChart) incomeExpenseChart.destroy();
-  if (categoryChart) categoryChart.destroy();
-  
-  // 1. Group income & expenses by month (last 6 months)
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  const dataMonths = [];
-  const incomeData = [];
-  const expenseData = [];
-  
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const month = d.getMonth();
-    const year = d.getFullYear();
-    
-    dataMonths.push(`${monthNames[month]} ${year.toString().slice(-2)}`);
-    
-    const monthlyTxs = userTransactions.filter(t => {
-      const txDate = new Date(t.date);
-      return txDate.getMonth() === month && txDate.getFullYear() === year && t.status === 'completed';
-    });
-    
-    const inc = monthlyTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    const exp = monthlyTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    
-    incomeData.push(inc);
-    expenseData.push(exp);
-  }
-  
-  // Render Bar Chart
-  incomeExpenseChart = new Chart(ctxBar, {
-    type: 'bar',
-    data: {
-      labels: dataMonths,
-      datasets: [
-        {
-          label: 'Pemasukan',
-          data: incomeData,
-          backgroundColor: '#10B981',
-          borderRadius: 6
-        },
-        {
-          label: 'Pengeluaran',
-          data: expenseData,
-          backgroundColor: '#EF4444',
-          borderRadius: 6
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          grid: { color: 'rgba(255, 255, 255, 0.05)' }
-        },
-        x: { grid: { display: false } }
-      },
-      plugins: {
-        legend: { labels: { color: 'var(--text-primary)' } }
-      }
-    }
-  });
-  
-  // 2. Calculate expenses by category for current month
-  const now = new Date();
-  const currentMonthTxs = userTransactions.filter(t => {
-    const txDate = new Date(t.date);
-    return t.type === 'expense' && t.status === 'completed' && txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
-  });
-  
-  const categoryMap = new Map(userCategories.map(c => [c.id, c]));
-  const catSums = {};
-  
-  currentMonthTxs.forEach(t => {
-    const cat = categoryMap.get(t.category_id);
-    const catName = cat ? cat.name : 'Lainnya';
-    catSums[catName] = (catSums[catName] || 0) + parseFloat(t.amount);
-  });
-  
-  const pieLabels = Object.keys(catSums);
-  const pieData = Object.values(catSums);
-  const pieColors = ['#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#64748B'];
-  
-  // Render Pie Chart
-  categoryChart = new Chart(ctxPie, {
-    type: 'doughnut',
-    data: {
-      labels: pieLabels.length > 0 ? pieLabels : ['Tidak ada pengeluaran'],
-      datasets: [{
-        data: pieData.length > 0 ? pieData : [1],
-        backgroundColor: pieColors.slice(0, pieLabels.length > 0 ? pieLabels.length : 1),
-        borderWidth: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'right',
-          labels: { color: 'var(--text-primary)', boxWidth: 12 }
-        }
-      }
-    }
-  });
-}
-
-// 9. Populating select dropdown options dynamically
-function populateSelectOptions() {
-  const accountSelects = [
-    document.getElementById('filter-account'),
-    document.getElementById('tx-account'),
-    document.getElementById('tx-transfer-to')
-  ];
-  
-  const categorySelects = [
-    document.getElementById('filter-category'),
-    document.getElementById('tx-category')
-  ];
-  
-  // Clear select items but keep first defaults
-  accountSelects.forEach(select => {
-    if (!select) return;
-    const defaultOpt = select.options[0];
-    select.innerHTML = '';
-    select.appendChild(defaultOpt);
-  });
-  
-  categorySelects.forEach(select => {
-    if (!select) return;
-    const defaultOpt = select.options[0];
-    select.innerHTML = '';
-    select.appendChild(defaultOpt);
-  });
-  
-  // Add accounts
-  userAccounts.forEach(acc => {
-    accountSelects.forEach(select => {
-      if (!select) return;
-      const opt = document.createElement('option');
-      opt.value = acc.id;
-      opt.innerText = `${acc.name} (${formatIDR(acc.balance)})`;
-      select.appendChild(opt);
-    });
-  });
-  
-  // Add categories
-  userCategories.forEach(cat => {
-    categorySelects.forEach(select => {
-      if (!select) return;
-      const opt = document.createElement('option');
-      opt.value = cat.id;
-      opt.innerText = `${cat.name} (${cat.type === 'income' ? 'Pemasukan' : 'Pengeluaran'})`;
-      // Don't show default category selection in filters when they don't match or add logic
-      select.appendChild(opt);
-    });
-  });
-  
-  // Update budget categories checkboxes in modal
-  const budgetCatContainer = document.getElementById('budget-categories-selector');
-  budgetCatContainer.innerHTML = '';
-  userCategories
-    .filter(cat => cat.type === 'expense')
-    .forEach(cat => {
-      const item = document.createElement('label');
-      item.className = 'budget-cat-item';
-      item.innerHTML = `
-        <input type="checkbox" name="budget-cats" value="${cat.id}">
-        <span>${cat.name}</span>
-      `;
-      budgetCatContainer.appendChild(item);
-    });
-}
-
-// 10. Operations: Create / Delete
-
-// 10a. Transactions
-async function createTransaction(e) {
-  e.preventDefault();
-  
-  const txId = document.getElementById('transaction-edit-id').value;
-  const type = document.querySelector('input[name="tx-type"]:checked').value;
-  const amount = parseFloat(document.getElementById('tx-amount').value);
-  const accountId = document.getElementById('tx-account').value;
-  const transferToAccountId = document.getElementById('tx-transfer-to').value;
-  const categoryId = document.getElementById('tx-category').value;
-  const date = document.getElementById('tx-date').value;
-  const note = document.getElementById('tx-note').value;
-  
-  if (!accountId || (type === 'transfer' && !transferToAccountId) || (!categoryId && type !== 'transfer') || amount <= 0 || !date) {
-    alert('Mohon lengkapi semua field bertanda bintang (*)');
+  const el = $('tx-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-msg">Tidak ada transaksi yang sesuai</div>';
     return;
   }
-  
+  el.innerHTML = list.map(t => `
+    <div class="tx-item">
+      <div class="tx-badge ${t.type}">${typeEmoji(t.type)}</div>
+      <div class="tx-body">
+        <div class="tx-note">${t.notes || '–'}</div>
+        <div class="tx-meta">${categoryName(t.category_id)} · ${accountName(t.account_id)}</div>
+      </div>
+      <div class="tx-right">
+        <div class="tx-amount ${t.type}">${t.type === 'income' ? '+' : t.type === 'expense' ? '-' : '⇄'} ${idr(t.amount)}</div>
+        <div class="tx-date">${formatDate(t.date)}</div>
+      </div>
+      <div class="tx-actions">
+        <button class="btn-icon" onclick="editTx('${t.id}')" title="Edit">✏️</button>
+        <button class="btn-icon btn-danger" onclick="deleteTx('${t.id}')" title="Hapus">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+
+function txItemHTML(t) {
+  return `
+    <div class="list-item">
+      <div class="list-icon" style="background:${typeColor(t.type)}22">${typeEmoji(t.type)}</div>
+      <div class="list-main">
+        <div class="list-title">${t.notes || categoryName(t.category_id) || '–'}</div>
+        <div class="list-sub">${accountName(t.account_id)} · ${formatDate(t.date)}</div>
+      </div>
+      <div class="list-amount ${t.type}">${t.type === 'income' ? '+' : '-'}${idr(t.amount)}</div>
+    </div>`;
+}
+
+// ── Accounts ──
+function renderAccounts() {
+  const el = $('accounts-grid');
+  if (!ACCOUNTS.length) {
+    el.innerHTML = '<div class="empty-msg">Belum ada rekening. Klik Tambah untuk membuat rekening baru!</div>';
+    return;
+  }
+  el.innerHTML = ACCOUNTS.map(a => `
+    <div class="account-card" style="--card-color:${a.color || '#0ea5e9'}">
+      <div class="acc-type-label">${accountTypeLabel(a.account_type)}</div>
+      <div class="acc-name">${a.name}</div>
+      <div class="acc-balance">${idr(a.balance)}</div>
+      <div class="acc-footer">
+        <span class="acc-bank">${a.bank_name || a.account_number || ''}</span>
+        <div class="acc-actions">
+          <button onclick="editAccount('${a.id}')">✏️ Edit</button>
+          <button onclick="deleteAccount('${a.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Budgets ──
+function renderBudgets() {
+  const el = $('budgets-grid');
+  if (!BUDGETS.length) {
+    el.innerHTML = '<div class="empty-msg">Belum ada anggaran. Klik Tambah untuk membuat anggaran!</div>';
+    return;
+  }
+  const now = monthNow();
+  el.innerHTML = BUDGETS.map(b => {
+    const itemIds  = BUDGET_ITEMS.filter(i => i.budget_id === b.id).map(i => i.category_id);
+    const spent    = TRANSACTIONS
+      .filter(t => t.type === 'expense' && t.date?.startsWith(now) && itemIds.includes(t.category_id))
+      .reduce((s, t) => s + (t.amount || 0), 0);
+    const pct      = b.monthly_limit ? Math.min(Math.round(spent / b.monthly_limit * 100), 100) : 0;
+    const over     = spent > b.monthly_limit;
+    const catNames = itemIds.map(id => categoryName(id)).filter(Boolean);
+    return `
+      <div class="budget-card" style="--bud-color:${b.color || '#10b981'}">
+        <div class="bud-head">
+          <span class="bud-name">${b.name}</span>
+          <div class="bud-actions">
+            <button class="btn-icon" onclick="deleteBudget('${b.id}')" title="Hapus">🗑️</button>
+          </div>
+        </div>
+        <div class="bud-amounts">
+          <span>Terpakai: <strong style="color:${over?'var(--expense)':'inherit'}">${idr(spent)}</strong></span>
+          <span>Limit: <strong>${idr(b.monthly_limit)}</strong></span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill${over?' over':''}" style="width:${pct}%"></div></div>
+        <div class="bud-percent">${pct}% terpakai${over?' — Melebihi anggaran! ⚠️':''}</div>
+        ${catNames.length ? `<div class="bud-cats">${catNames.map(n=>`<span class="bud-cat-tag">${n}</span>`).join('')}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// ── Reports ──
+function renderReports() {
+  renderBarChart();
+  renderPieChart();
+}
+
+function renderBarChart() {
+  const ctx = $('chart-bar')?.getContext('2d');
+  if (!ctx) return;
+  const months = getLast6Months();
+  const incomes  = months.map(m => TRANSACTIONS.filter(t => t.type==='income'  && t.date?.startsWith(m)).reduce((s,t)=>s+t.amount,0));
+  const expenses = months.map(m => TRANSACTIONS.filter(t => t.type==='expense' && t.date?.startsWith(m)).reduce((s,t)=>s+t.amount,0));
+  if (chartBar) chartBar.destroy();
+  chartBar = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months.map(m => { const d=new Date(m+'-01'); return d.toLocaleDateString('id-ID',{month:'short',year:'2-digit'}); }),
+      datasets: [
+        { label:'Pemasukan',  data: incomes,  backgroundColor:'rgba(16,185,129,.7)',  borderRadius:4 },
+        { label:'Pengeluaran',data: expenses, backgroundColor:'rgba(239,68,68,.7)',   borderRadius:4 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#94a3b8'}}}, scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#94a3b8',callback:v=>idr(v)},grid:{color:'rgba(255,255,255,.05)'}}}}
+  });
+}
+
+function renderPieChart() {
+  const ctx = $('chart-pie')?.getContext('2d');
+  if (!ctx) return;
+  const now = monthNow();
+  const expTx = TRANSACTIONS.filter(t => t.type==='expense' && t.date?.startsWith(now));
+  const catMap = {};
+  expTx.forEach(t => {
+    const name = categoryName(t.category_id) || 'Lainnya';
+    catMap[name] = (catMap[name] || 0) + t.amount;
+  });
+  const labels = Object.keys(catMap);
+  const values = Object.values(catMap);
+  const colors = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#0ea5e9','#14b8a6'];
+  if (chartPie) chartPie.destroy();
+  chartPie = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets:[{ data:values, backgroundColor:colors.slice(0,labels.length), borderWidth:0 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',padding:12}}} }
+  });
+}
+
+function getLast6Months() {
+  const months = [];
+  const d = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    months.push(`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`);
+  }
+  return months;
+}
+
+// ── Populate Selects ──
+function populateSelects() {
+  // Account selects
+  const accOpts = ACCOUNTS.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+  $('tx-account').innerHTML   = '<option value="">Pilih rekening</option>' + accOpts;
+  $('tx-to-account').innerHTML = '<option value="">Pilih tujuan</option>' + accOpts;
+  $('filter-account') && ($('filter-account').innerHTML = '<option value="">Semua Rekening</option>' + accOpts);
+
+  // Category select
+  const expCats = CATEGORIES.filter(c => c.type === 'expense' || c.type === 'both');
+  const incCats = CATEGORIES.filter(c => c.type === 'income'  || c.type === 'both');
+  const allCats = CATEGORIES;
+  $('tx-category').innerHTML = '<option value="">Pilih kategori</option>' +
+    allCats.map(c => `<option value="${c.id}" data-type="${c.type}">${c.name}</option>`).join('');
+
+  // Budget category checkboxes
+  const budCats = $('bud-cats');
+  if (budCats) {
+    budCats.innerHTML = CATEGORIES.filter(c => c.type === 'expense' || c.type === 'both').map(c => `
+      <label class="checkbox-item">
+        <input type="checkbox" name="bud-cat" value="${c.id}">
+        <span>${c.name}</span>
+      </label>`).join('');
+  }
+
+  // Filter month default
+  if ($('filter-month') && !$('filter-month').value) $('filter-month').value = monthNow();
+  txFilter.month = monthNow();
+}
+
+// ── Navigation ──
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(n => {
+    n.classList.toggle('active', n.dataset.tab === tab);
+  });
+  const panel = $(`tab-${tab}`);
+  if (panel) panel.classList.remove('hidden');
+  $('page-title').textContent = { dashboard:'Dashboard', transactions:'Transaksi', accounts:'Rekening', budgets:'Anggaran', reports:'Laporan' }[tab] || tab;
+  if (tab === 'reports') renderReports();
+}
+
+// ── CRUD: Transactions ──
+function openTxModal(type = 'expense') {
+  $('tx-edit-id').value = '';
+  $('form-tx').reset();
+  $('tx-date').value = today();
+  setTxType(type);
+  populateSelects();
+  openModal('modal-tx');
+}
+
+function setTxType(type) {
+  document.querySelectorAll('.seg-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.type === type);
+    t.querySelector('input').checked = t.dataset.type === type;
+  });
+  $('tx-to-field').style.display  = type === 'transfer' ? '' : 'none';
+  $('tx-cat-field').style.display = type === 'transfer' ? 'none' : '';
+  // Filter categories by type
+  Array.from($('tx-category').options).forEach(o => {
+    if (!o.value) return;
+    const catType = o.dataset.type || '';
+    o.style.display = (catType === type || catType === 'both' || (type === 'income' && catType === 'income') || (type === 'expense' && catType === 'expense')) ? '' : 'none';
+  });
+}
+
+$('form-tx').addEventListener('submit', async e => {
+  e.preventDefault();
+  const type     = document.querySelector('.seg-tab.active')?.dataset.type || 'expense';
+  const amount   = parseFloat($('tx-amount').value);
+  const accountId= $('tx-account').value;
+  const catId    = $('tx-category').value;
+  const toAccId  = $('tx-to-account').value;
+  const date     = $('tx-date').value;
+  const notes    = $('tx-note').value.trim();
+  const editId   = $('tx-edit-id').value;
+
+  if (!amount || amount <= 0) return alert('Jumlah harus lebih dari 0');
+  if (!accountId) return alert('Pilih rekening');
+  if (type !== 'transfer' && !catId) return alert('Pilih kategori');
+  if (type === 'transfer' && !toAccId) return alert('Pilih rekening tujuan');
+
   showLoader();
   try {
-    const data = {
-      user_id: currentUser.id,
-      account_id: accountId,
-      category_id: type === 'transfer' ? null : categoryId,
-      type: type,
-      amount: amount,
-      date: date,
-      note: note,
-      status: 'completed',
-      transfer_to_account_id: type === 'transfer' ? transferToAccountId : null
-    };
-    
-    // 1. Insert Transaction to Supabase
-    let txResponse;
-    if (txId) {
-      txResponse = await supabase.from('transactions').update(data).eq('id', txId).select().single();
+    if (editId) {
+      await sb.from('transactions').update({ type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, notes }).eq('id', editId);
     } else {
-      txResponse = await supabase.from('transactions').insert(data).select().single();
-    }
-    
-    if (txResponse.error) throw txResponse.error;
-    
-    // 2. CLIENT-SIDE ACCOUNT BALANCE UPDATE (Safely updates account balances)
-    const sourceAcc = userAccounts.find(a => a.id === accountId);
-    if (sourceAcc) {
-      let sourceNewBalance = parseFloat(sourceAcc.balance);
-      if (type === 'income') {
-        sourceNewBalance += amount;
-      } else if (type === 'expense' || type === 'transfer') {
-        sourceNewBalance -= amount;
-      }
-      await supabase.from('accounts').update({ balance: sourceNewBalance }).eq('id', accountId);
-    }
-    
-    if (type === 'transfer' && transferToAccountId) {
-      const destAcc = userAccounts.find(a => a.id === transferToAccountId);
-      if (destAcc) {
-        const destNewBalance = parseFloat(destAcc.balance) + amount;
-        await supabase.from('accounts').update({ balance: destNewBalance }).eq('id', transferToAccountId);
+      await sb.from('transactions').insert({ user_id: USER.id, type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, notes });
+      // Update balance
+      const account = ACCOUNTS.find(a => a.id === accountId);
+      if (account) {
+        const delta = type === 'income' ? amount : type === 'expense' ? -amount : -amount;
+        await sb.from('accounts').update({ balance: (account.balance || 0) + delta }).eq('id', accountId);
+        if (type === 'transfer' && toAccId) {
+          const toAcc = ACCOUNTS.find(a => a.id === toAccId);
+          if (toAcc) await sb.from('accounts').update({ balance: (toAcc.balance || 0) + amount }).eq('id', toAccId);
+        }
       }
     }
-    
-    // Close modal and reload app
-    hideElement('modal-transaction');
-    document.getElementById('form-transaction').reset();
-    await initApp();
-    
-  } catch (err) {
-    console.error('Error saat menyimpan transaksi:', err);
+    closeModal('modal-tx');
+    await loadAll();
+    renderAll();
+  } catch(err) {
     alert('Gagal menyimpan transaksi: ' + err.message);
   } finally {
     hideLoader();
   }
+});
+
+async function editTx(id) {
+  const t = TRANSACTIONS.find(t => t.id === id);
+  if (!t) return;
+  $('tx-edit-id').value = id;
+  $('tx-amount').value  = t.amount;
+  $('tx-date').value    = t.date;
+  $('tx-note').value    = t.notes || '';
+  populateSelects();
+  setTxType(t.type);
+  $('tx-account').value    = t.account_id || '';
+  $('tx-category').value   = t.category_id || '';
+  $('tx-to-account').value = t.transfer_to_account_id || '';
+  openModal('modal-tx');
 }
 
-async function deleteTransaction(id) {
-  if (!confirm('Apakah Anda yakin ingin menghapus transaksi ini? Saldo rekening Anda akan disesuaikan kembali.')) return;
-  
+async function deleteTx(id) {
+  if (!confirm('Hapus transaksi ini?')) return;
   showLoader();
   try {
-    // Get the transaction details before deleting so we can adjust balances
-    const tx = userTransactions.find(t => t.id === id);
-    if (!tx) return;
-    
-    // 1. Delete Transaction from Supabase
-    const { error } = await supabase.from('transactions').delete().eq('id', id);
-    if (error) throw error;
-    
-    // 2. Adjust account balances (REVERT balance changes)
-    const sourceAcc = userAccounts.find(a => a.id === tx.account_id);
-    if (sourceAcc) {
-      let sourceNewBalance = parseFloat(sourceAcc.balance);
-      if (tx.type === 'income') {
-        sourceNewBalance -= parseFloat(tx.amount);
-      } else if (tx.type === 'expense' || tx.type === 'transfer') {
-        sourceNewBalance += parseFloat(tx.amount);
+    const t = TRANSACTIONS.find(t => t.id === id);
+    await sb.from('transactions').delete().eq('id', id);
+    if (t) {
+      const account = ACCOUNTS.find(a => a.id === t.account_id);
+      if (account) {
+        const delta = t.type === 'income' ? -t.amount : t.type === 'expense' ? t.amount : t.amount;
+        await sb.from('accounts').update({ balance: (account.balance || 0) + delta }).eq('id', t.account_id);
+        if (t.type === 'transfer' && t.transfer_to_account_id) {
+          const toAcc = ACCOUNTS.find(a => a.id === t.transfer_to_account_id);
+          if (toAcc) await sb.from('accounts').update({ balance: (toAcc.balance || 0) - t.amount }).eq('id', t.transfer_to_account_id);
+        }
       }
-      await supabase.from('accounts').update({ balance: sourceNewBalance }).eq('id', tx.account_id);
     }
-    
-    if (tx.type === 'transfer' && tx.transfer_to_account_id) {
-      const destAcc = userAccounts.find(a => a.id === tx.transfer_to_account_id);
-      if (destAcc) {
-        const destNewBalance = parseFloat(destAcc.balance) - parseFloat(tx.amount);
-        await supabase.from('accounts').update({ balance: destNewBalance }).eq('id', tx.transfer_to_account_id);
-      }
+    await loadAll(); renderAll();
+  } catch(err) { alert('Gagal: ' + err.message); }
+  finally { hideLoader(); }
+}
+
+// ── CRUD: Accounts ──
+function openAccountModal() {
+  $('acc-edit-id').value = '';
+  $('form-account').reset();
+  document.querySelector('[name="acc-color"][value="#0ea5e9"]').checked = true;
+  openModal('modal-account');
+}
+
+$('form-account').addEventListener('submit', async e => {
+  e.preventDefault();
+  const editId  = $('acc-edit-id').value;
+  const name    = $('acc-name').value.trim();
+  const type    = $('acc-type').value;
+  const balance = parseFloat($('acc-balance').value) || 0;
+  const bank    = $('acc-bank').value.trim();
+  const number  = $('acc-number').value.trim();
+  const color   = document.querySelector('[name="acc-color"]:checked')?.value || '#0ea5e9';
+  if (!name) return alert('Nama rekening wajib diisi');
+
+  showLoader();
+  try {
+    if (editId) {
+      await sb.from('accounts').update({ name, account_type: type, bank_name: bank, account_number: number, color }).eq('id', editId);
+    } else {
+      await sb.from('accounts').insert({ user_id: USER.id, name, account_type: type, balance, bank_name: bank, account_number: number, color, is_active: true });
     }
-    
-    await initApp();
-  } catch (err) {
-    console.error('Gagal menghapus transaksi:', err);
-    alert('Error menghapus transaksi: ' + err.message);
-  } finally {
-    hideLoader();
-  }
+    closeModal('modal-account');
+    await loadAll(); renderAll();
+  } catch(err) { alert('Gagal: ' + err.message); }
+  finally { hideLoader(); }
+});
+
+async function editAccount(id) {
+  const a = ACCOUNTS.find(a => a.id === id);
+  if (!a) return;
+  $('acc-edit-id').value = id;
+  $('acc-name').value    = a.name;
+  $('acc-type').value    = a.account_type;
+  $('acc-balance').value = a.balance;
+  $('acc-bank').value    = a.bank_name || '';
+  $('acc-number').value  = a.account_number || '';
+  const colorRadio = document.querySelector(`[name="acc-color"][value="${a.color}"]`);
+  if (colorRadio) colorRadio.checked = true;
+  openModal('modal-account');
 }
 
-// 10b. Accounts
-async function createAccount(e) {
+async function deleteAccount(id) {
+  if (!confirm('Hapus rekening ini? Semua transaksi terkait akan tetap ada.')) return;
+  showLoader();
+  try {
+    await sb.from('accounts').update({ is_active: false }).eq('id', id);
+    await loadAll(); renderAll();
+  } catch(err) { alert('Gagal: ' + err.message); }
+  finally { hideLoader(); }
+}
+
+// ── CRUD: Budgets ──
+function openBudgetModal() {
+  $('bud-edit-id').value = '';
+  $('form-budget').reset();
+  document.querySelector('[name="bud-color"][value="#10b981"]').checked = true;
+  populateSelects();
+  openModal('modal-budget');
+}
+
+$('form-budget').addEventListener('submit', async e => {
   e.preventDefault();
-  
-  const name = document.getElementById('account-name').value;
-  const type = document.getElementById('account-type').value;
-  const balance = parseFloat(document.getElementById('account-balance').value);
-  const bankName = document.getElementById('account-bank-name').value;
-  const accountNumber = document.getElementById('account-number').value;
-  const color = document.querySelector('input[name="account-color"]:checked').value;
-  
-  if (!name || !type || isNaN(balance)) {
-    alert('Silakan lengkapi semua field utama');
-    return;
-  }
-  
-  showLoader();
-  try {
-    const data = {
-      user_id: currentUser.id,
-      name,
-      type,
-      balance,
-      bank_name: bankName || null,
-      account_number: accountNumber || null,
-      color,
-      is_active: true,
-      is_archived: false
-    };
-    
-    const { error } = await supabase.from('accounts').insert(data);
-    if (error) throw error;
-    
-    hideElement('modal-account');
-    document.getElementById('form-account').reset();
-    await initApp();
-    
-  } catch (err) {
-    console.error('Gagal membuat rekening:', err);
-    alert('Gagal membuat rekening: ' + err.message);
-  } finally {
-    hideLoader();
-  }
-}
+  const name   = $('bud-name').value.trim();
+  const amount = parseFloat($('bud-amount').value) || 0;
+  const color  = document.querySelector('[name="bud-color"]:checked')?.value || '#10b981';
+  const catIds = [...document.querySelectorAll('[name="bud-cat"]:checked')].map(c => c.value);
+  if (!name) return alert('Nama anggaran wajib diisi');
+  if (!amount) return alert('Batas anggaran harus lebih dari 0');
 
-async function deleteAccount(id, name) {
-  if (!confirm(`Apakah Anda yakin ingin menghapus rekening "${name}"? Seluruh transaksi yang terikat pada rekening ini juga akan ikut terhapus.`)) return;
-  
   showLoader();
   try {
-    const { error } = await supabase.from('accounts').delete().eq('id', id);
+    const { data: bud, error } = await sb.from('budgets').insert({ user_id: USER.id, name, monthly_limit: amount, color, is_active: true }).select().single();
     if (error) throw error;
-    await initApp();
-  } catch (err) {
-    console.error('Gagal menghapus rekening:', err);
-    alert('Gagal menghapus rekening: ' + err.message);
-  } finally {
-    hideLoader();
-  }
-}
-
-// 10c. Budgets
-async function createBudget(e) {
-  e.preventDefault();
-  
-  const name = document.getElementById('budget-name').value;
-  const amount = parseFloat(document.getElementById('budget-amount').value);
-  const color = document.querySelector('input[name="budget-color"]:checked').value;
-  
-  // Get selected category checkboxes
-  const checkboxes = document.querySelectorAll('input[name="budget-cats"]:checked');
-  const selectedCatIds = Array.from(checkboxes).map(cb => cb.value);
-  
-  if (!name || isNaN(amount) || selectedCatIds.length === 0) {
-    alert('Mohon isi nama anggaran, nominal, dan pilih minimal 1 kategori');
-    return;
-  }
-  
-  showLoader();
-  try {
-    // 1. Insert Budget
-    const { data: budgetData, error: budgetErr } = await supabase
-      .from('budgets')
-      .insert({
-        user_id: currentUser.id,
-        name,
-        amount,
-        period: 'monthly',
-        color,
-        is_active: true
-      })
-      .select()
-      .single();
-      
-    if (budgetErr) throw budgetErr;
-    
-    // 2. Insert Budget Items
-    const allocatedPerCat = amount / selectedCatIds.length;
-    const itemsToInsert = selectedCatIds.map(catId => ({
-      budget_id: budgetData.id,
-      category_id: catId,
-      allocated: allocatedPerCat,
-      spent: 0
-    }));
-    
-    const { error: itemsErr } = await supabase.from('budget_items').insert(itemsToInsert);
-    if (itemsErr) throw itemsErr;
-    
-    hideElement('modal-budget');
-    document.getElementById('form-budget').reset();
-    await initApp();
-    
-  } catch (err) {
-    console.error('Gagal membuat anggaran:', err);
-    alert('Gagal membuat anggaran: ' + err.message);
-  } finally {
-    hideLoader();
-  }
-}
+    if (catIds.length && bud) {
+      await sb.from('budget_items').insert(catIds.map(cid => ({ budget_id: bud.id, category_id: cid })));
+    }
+    closeModal('modal-budget');
+    await loadAll(); renderAll();
+  } catch(err) { alert('Gagal: ' + err.message); }
+  finally { hideLoader(); }
+});
 
 async function deleteBudget(id) {
-  if (!confirm('Apakah Anda yakin ingin menghapus anggaran ini?')) return;
-  
+  if (!confirm('Hapus anggaran ini?')) return;
   showLoader();
   try {
-    const { error } = await supabase.from('budgets').delete().eq('id', id);
-    if (error) throw error;
-    await initApp();
-  } catch (err) {
-    console.error('Gagal menghapus anggaran:', err);
-    alert('Gagal menghapus anggaran: ' + err.message);
-  } finally {
-    hideLoader();
-  }
+    await sb.from('budget_items').delete().eq('budget_id', id);
+    await sb.from('budgets').update({ is_active: false }).eq('id', id);
+    await loadAll(); renderAll();
+  } catch(err) { alert('Gagal: ' + err.message); }
+  finally { hideLoader(); }
 }
 
-// 11. Modal UI Event Listeners
-function initModalListeners() {
-  // Modal Account
-  document.getElementById('qa-add-account').addEventListener('click', (e) => {
-    e.preventDefault();
-    hideElement('quick-action-menu');
-    document.getElementById('modal-account-title').innerText = 'Buat Rekening Baru';
-    document.getElementById('form-account').reset();
-    showElement('modal-account');
-  });
-  
-  document.getElementById('btn-add-account-empty').addEventListener('click', () => {
-    showElement('modal-account');
-  });
-  
-  document.getElementById('btn-close-account-modal').addEventListener('click', () => hideElement('modal-account'));
-  document.getElementById('btn-cancel-account').addEventListener('click', () => hideElement('modal-account'));
-  document.getElementById('form-account').addEventListener('submit', createAccount);
+// ── Auth ──
+let isSignUp = false;
 
-  // Modal Transaction
-  const showTxModal = (type = 'expense') => {
-    hideElement('quick-action-menu');
-    document.getElementById('modal-transaction-title').innerText = 'Catat Transaksi Baru';
-    document.getElementById('form-transaction').reset();
-    document.getElementById('transaction-edit-id').value = '';
-    
-    // Set active type segment button
-    document.querySelectorAll('.type-btn').forEach(btn => {
-      if (btn.getAttribute('data-type') === type) {
-        btn.classList.add('active');
-        btn.querySelector('input').checked = true;
-      } else {
-        btn.classList.remove('active');
-      }
-    });
-    
-    // Trigger form inputs visibility based on type
-    toggleTxTypeFields(type);
-    
-    // Set default date to today
-    document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
-    
-    showElement('modal-transaction');
-  };
-
-  document.getElementById('qa-add-income').addEventListener('click', (e) => { e.preventDefault(); showTxModal('income'); });
-  document.getElementById('qa-add-expense').addEventListener('click', (e) => { e.preventDefault(); showTxModal('expense'); });
-  document.getElementById('qa-add-transfer').addEventListener('click', (e) => { e.preventDefault(); showTxModal('transfer'); });
-  
-  document.getElementById('btn-close-transaction-modal').addEventListener('click', () => hideElement('modal-transaction'));
-  document.getElementById('btn-cancel-transaction').addEventListener('click', () => hideElement('modal-transaction'));
-  document.getElementById('form-transaction').addEventListener('submit', createTransaction);
-
-  // Transaction type toggle inside modal
-  document.querySelectorAll('.type-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const radio = btn.querySelector('input');
-      radio.checked = true;
-      toggleTxTypeFields(radio.value);
-    });
-  });
-
-  // Modal Budget
-  document.getElementById('qa-add-budget').addEventListener('click', (e) => {
-    e.preventDefault();
-    hideElement('quick-action-menu');
-    showElement('modal-budget');
-  });
-  
-  document.getElementById('btn-add-budget-empty').addEventListener('click', () => {
-    showElement('modal-budget');
-  });
-  
-  document.getElementById('btn-close-budget-modal').addEventListener('click', () => hideElement('modal-budget'));
-  document.getElementById('btn-cancel-budget').addEventListener('click', () => hideElement('modal-budget'));
-  document.getElementById('form-budget').addEventListener('submit', createBudget);
-
-  // Mobile menu/profil drawer
-  document.getElementById('mobile-menu-btn').addEventListener('click', (e) => {
-    e.preventDefault();
-    showElement('modal-mobile-menu');
-  });
-  document.getElementById('btn-close-mobile-menu').addEventListener('click', () => hideElement('modal-mobile-menu'));
-
-  // Quick Action menu toggle
-  document.getElementById('btn-quick-action').addEventListener('click', (e) => {
-    e.stopPropagation();
-    document.getElementById('quick-action-menu').classList.toggle('hidden');
-  });
-  
-  // Close dropdowns/modals on background clicks
-  window.addEventListener('click', () => {
-    const menu = document.getElementById('quick-action-menu');
-    if (menu) menu.classList.add('hidden');
-  });
+function toggleAuthMode(signUp) {
+  isSignUp = signUp;
+  $('auth-title').textContent    = signUp ? 'Buat Akun Baru' : 'Masuk ke Akun';
+  $('auth-subtitle').textContent = signUp ? 'Mulai kelola keuangan Anda hari ini' : 'Kelola keuangan Anda secara realtime';
+  $('auth-btn-text').textContent = signUp ? 'Daftar' : 'Masuk';
+  $('auth-switch-text').textContent = signUp ? 'Sudah punya akun?' : 'Belum punya akun?';
+  $('auth-switch-btn').textContent  = signUp ? 'Masuk sekarang' : 'Daftar sekarang';
+  signUp ? show('name-field') : hide('name-field');
+  hide('auth-error');
 }
 
-function toggleTxTypeFields(type) {
-  const destGroup = document.getElementById('tx-dest-account-group');
-  const catGroup = document.getElementById('tx-category-group');
-  const sourceLabel = document.getElementById('tx-source-account-group').querySelector('label');
-  
-  if (type === 'transfer') {
-    destGroup.classList.remove('hidden');
-    catGroup.classList.add('hidden');
-    document.getElementById('tx-transfer-to').required = true;
-    document.getElementById('tx-category').required = false;
-    sourceLabel.innerText = 'Rekening Asal *';
-  } else {
-    destGroup.classList.add('hidden');
-    catGroup.classList.remove('hidden');
-    document.getElementById('tx-transfer-to').required = false;
-    document.getElementById('tx-category').required = true;
-    sourceLabel.innerText = 'Rekening *';
-    
-    // Filter categories shown based on transaction type (income/expense)
-    const catSelect = document.getElementById('tx-category');
-    Array.from(catSelect.options).forEach(opt => {
-      if (opt.value === "") return;
-      const cat = userCategories.find(c => c.id === opt.value);
-      if (cat && cat.type !== type) {
-        opt.style.display = 'none';
-      } else {
-        opt.style.display = 'block';
-      }
-    });
-    catSelect.value = ""; // Reset value
-  }
-}
+$('auth-switch-btn').addEventListener('click', () => toggleAuthMode(!isSignUp));
 
-// 12. Register filters change listeners
-function initFiltersListeners() {
-  const searchInput = document.getElementById('filter-search');
-  const typeSelect = document.getElementById('filter-type');
-  const accSelect = document.getElementById('filter-account');
-  const catSelect = document.getElementById('filter-category');
-  const startDate = document.getElementById('filter-start-date');
-  const endDate = document.getElementById('filter-end-date');
-  
-  const triggerFilter = () => renderTransactionsList();
-  
-  searchInput.addEventListener('input', triggerFilter);
-  typeSelect.addEventListener('change', triggerFilter);
-  accSelect.addEventListener('change', triggerFilter);
-  catSelect.addEventListener('change', triggerFilter);
-  startDate.addEventListener('change', triggerFilter);
-  endDate.addEventListener('change', triggerFilter);
-  
-  document.getElementById('btn-reset-filters').addEventListener('click', () => {
-    searchInput.value = '';
-    typeSelect.value = '';
-    accSelect.value = '';
-    catSelect.value = '';
-    startDate.value = '';
-    endDate.value = '';
-    triggerFilter();
-  });
-}
+$('btn-toggle-pw').addEventListener('click', () => {
+  const inp = $('input-password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+});
 
-// 13. Registration/Login Handler
-async function handleAuthSubmit(e) {
+$('auth-form').addEventListener('submit', async e => {
   e.preventDefault();
-  
-  const name = document.getElementById('auth-name').value;
-  const email = document.getElementById('auth-email').value;
-  const password = document.getElementById('auth-password').value;
-  
-  const submitBtn = document.getElementById('auth-submit-btn');
-  const spinner = submitBtn.querySelector('.btn-spinner');
-  const btnText = submitBtn.querySelector('span');
-  
-  spinner.classList.remove('hidden');
-  btnText.classList.add('hidden');
-  submitBtn.disabled = true;
-  
+  const email    = $('input-email').value.trim();
+  const password = $('input-password').value;
+  const name     = $('input-name').value.trim();
+
+  hide('auth-error');
+  $('auth-btn-text').classList.add('hidden');
+  show('auth-btn-spinner');
+  $('auth-submit').disabled = true;
+
   try {
-    if (isSignUpMode) {
-      // 1. Sign Up User
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name
-          }
-        }
-      });
-      
-      if (error) throw error;
-      
-      alert('Registrasi Berhasil! Silakan cek email Anda untuk memverifikasi akun Anda, kemudian masuk.');
-      toggleAuthMode(false); // Switch to login
-      
+    let result;
+    if (isSignUp) {
+      result = await sb.auth.signUp({ email, password, options: { data: { full_name: name } } });
     } else {
-      // 2. Log In User
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      
-      // Load app
-      await checkSession();
+      result = await sb.auth.signInWithPassword({ email, password });
     }
-  } catch (err) {
-    console.error('Proses Auth Gagal:', err);
-    alert('Gagal melakukan otentikasi: ' + err.message);
+    if (result.error) throw result.error;
+    if (isSignUp && !result.data?.session) {
+      showAuthError('Pendaftaran berhasil! Silakan cek email Anda untuk konfirmasi.');
+    }
+  } catch(err) {
+    showAuthError(translateAuthError(err.message));
   } finally {
-    spinner.classList.add('hidden');
-    btnText.classList.remove('hidden');
-    submitBtn.disabled = false;
+    $('auth-btn-text').classList.remove('hidden');
+    hide('auth-btn-spinner');
+    $('auth-submit').disabled = false;
   }
+});
+
+function showAuthError(msg) {
+  $('auth-error').textContent = msg;
+  show('auth-error');
 }
 
-// 14. Logout Handler
-async function handleLogout() {
-  if (!confirm('Apakah Anda yakin ingin keluar dari aplikasi?')) return;
-  showLoader();
-  try {
-    await supabase.auth.signOut();
-    currentUser = null;
-    currentProfile = null;
-    
-    // Reset view variables
-    userAccounts = [];
-    userCategories = [];
-    userTransactions = [];
-    userBudgets = [];
-    userBudgetItems = [];
-    
-    hideElement('app-container');
-    showElement('auth-container');
-    toggleAuthMode(false);
-  } catch (err) {
-    console.error('Logout Gagal:', err);
-  } finally {
-    hideLoader();
-  }
+function translateAuthError(msg) {
+  if (msg.includes('Invalid login credentials')) return 'Email atau kata sandi salah.';
+  if (msg.includes('Email not confirmed'))       return 'Email belum dikonfirmasi. Cek kotak masuk email Anda.';
+  if (msg.includes('User already registered'))   return 'Email sudah terdaftar. Silakan masuk.';
+  if (msg.includes('Password should be'))        return 'Kata sandi minimal 6 karakter.';
+  return msg;
 }
 
-// 15. Safe Bootstrapping
-function bootstrap() {
-  console.log("Bootstrapping Financier Web App v1.0.4...");
-  if (!supabase) {
-    // Supabase failed to initialize - show auth container with error
-    const loader = document.getElementById('global-loader');
-    if (loader) loader.classList.add('hidden');
-    const authContainer = document.getElementById('auth-container');
-    if (authContainer) authContainer.classList.remove('hidden');
-    return;
-  }
-  initTheme();
-  
-  // Theme Toggle Button Listeners
-  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-  document.getElementById('mobile-theme-toggle').addEventListener('click', toggleTheme);
-  
-  // Form submission
-  document.getElementById('auth-form').addEventListener('submit', handleAuthSubmit);
-  
-  // Logout
-  document.getElementById('logout-btn').addEventListener('click', handleLogout);
-  document.getElementById('mobile-logout-btn').addEventListener('click', handleLogout);
-  
-  // Navigation & Modals Init
-  initNavigation();
-  initModalListeners();
-  initFiltersListeners();
-  
-  // Check active user session on startup
-  checkSession();
+$('btn-logout').addEventListener('click', async () => {
+  if (!confirm('Yakin ingin keluar?')) return;
+  await sb.auth.signOut();
+});
+
+// ── Theme ──
+function initTheme() {
+  const saved = localStorage.getItem('theme') || 'dark';
+  document.documentElement.dataset.theme = saved;
+  updateThemeIcon(saved);
 }
 
-// Run immediately if DOM is already loaded, otherwise wait for event
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bootstrap);
-} else {
-  bootstrap();
+function toggleTheme() {
+  const curr = document.documentElement.dataset.theme;
+  const next = curr === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('theme', next);
+  updateThemeIcon(next);
 }
+
+function updateThemeIcon(theme) {
+  document.querySelectorAll('.icon-sun').forEach(el => el.classList.toggle('hidden', theme === 'light'));
+  document.querySelectorAll('.icon-moon').forEach(el => el.classList.toggle('hidden', theme === 'dark'));
+}
+
+// ── Filter Listeners ──
+$('filter-q').addEventListener('input', e => { txFilter.q = e.target.value; renderTransactions(); });
+$('filter-type').addEventListener('change', e => { txFilter.type = e.target.value; renderTransactions(); });
+$('filter-month').addEventListener('change', e => { txFilter.month = e.target.value; renderTransactions(); });
+$('btn-reset-filter').addEventListener('click', () => {
+  txFilter = { q:'', type:'', month: monthNow() };
+  $('filter-q').value = '';
+  $('filter-type').value = '';
+  $('filter-month').value = monthNow();
+  renderTransactions();
+});
+
+// ── Quick Add ──
+function openQuickMenu() {
+  const menu = $('quick-menu');
+  menu.classList.toggle('hidden');
+}
+$('btn-add').addEventListener('click', openQuickMenu);
+$('mobile-add').addEventListener('click', e => { e.preventDefault(); openQuickMenu(); });
+$('quick-menu').querySelector('.quick-menu-backdrop').addEventListener('click', () => hide('quick-menu'));
+
+document.querySelectorAll('.quick-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    hide('quick-menu');
+    const action = btn.dataset.action;
+    if (action === 'account') { openAccountModal(); return; }
+    if (action === 'budget')  { openBudgetModal();  return; }
+    openTxModal(action);
+  });
+});
+
+// ── Nav ──
+document.querySelectorAll('[data-tab]').forEach(el => {
+  el.addEventListener('click', e => { e.preventDefault(); switchTab(el.dataset.tab); });
+});
+document.querySelectorAll('[data-tab-go]').forEach(el => {
+  el.addEventListener('click', e => { e.preventDefault(); switchTab(el.dataset.tabGo); });
+});
+
+// ── Modal close ──
+document.querySelectorAll('.modal-close').forEach(btn => {
+  btn.addEventListener('click', () => { const mid = btn.dataset.modal; if (mid) closeModal(mid); });
+});
+document.querySelectorAll('.modal').forEach(modal => {
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(modal.id); });
+});
+
+// ── Segment tabs ──
+document.querySelectorAll('.seg-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const type = tab.dataset.type;
+    setTxType(type);
+  });
+});
+
+// ── Theme button ──
+$('btn-theme').addEventListener('click', toggleTheme);
+
+// ── Util ──
+function accountName(id)   { return ACCOUNTS.find(a => a.id === id)?.name || '–'; }
+function categoryName(id)  { return CATEGORIES.find(c => c.id === id)?.name || '–'; }
+function accountTypeLabel(t) {
+  return { cash:'Tunai', bank:'Bank', ewallet:'E-Wallet', savings:'Tabungan', investment:'Investasi' }[t] || t;
+}
+function typeEmoji(t)  { return { income:'↓', expense:'↑', transfer:'⇄' }[t] || '•'; }
+function typeColor(t)  { return { income:'#10b981', expense:'#ef4444', transfer:'#f59e0b' }[t] || '#6366f1'; }
+function formatDate(d) {
+  if (!d) return '';
+  return new Date(d + 'T00:00:00').toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' });
+}
+
+// ── Init theme immediately ──
+initTheme();
