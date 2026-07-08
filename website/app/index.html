@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financier App — Kelola Keuangan Pribadi</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Aplikasi web pencatatan keuangan pribadi modern, sinkronasi realtime dengan Supabase cloud, multi rekening, anggaran bulanan, dan laporan grafik.">
+  <meta name="author" content="Financier">
+  <link rel="icon" type="image/svg+xml" href="../assets/icons/favicon.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind/CSS (Vanilla CSS will be used in style.css) -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Library Scripts (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  
+  <!-- Loader Global -->
+  <div id="global-loader" class="loader-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ════════ AUTH CONTAINER ════════ -->
+  <div id="auth-container" class="auth-wrapper hidden">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="logo">
+          <i data-lucide="wallet" class="logo-icon"></i>
+          <span>Financier</span>
+        </div>
+        <h2 id="auth-title">Masuk ke Akun Anda</h2>
+        <p id="auth-subtitle">Kelola keuangan Anda secara realtime</p>
+      </div>
+      
+      <form id="auth-form" class="auth-form">
+        <div class="form-group" id="name-group">
+          <label for="auth-name">Nama Lengkap</label>
+          <div class="input-wrapper">
+            <i data-lucide="user"></i>
+            <input type="text" id="auth-name" placeholder="Nama Lengkap Anda">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="auth-email">Alamat Email</label>
+          <div class="input-wrapper">
+            <i data-lucide="mail"></i>
+            <input type="email" id="auth-email" placeholder="nama@email.com" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="auth-password">Kata Sandi</label>
+          <div class="input-wrapper">
+            <i data-lucide="lock"></i>
+            <input type="password" id="auth-password" placeholder="••••••••" required>
+          </div>
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-block">
+          <span>Masuk</span>
+          <div class="btn-spinner hidden"></div>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p id="auth-toggle-text">Belum punya akun? <a href="#" id="auth-toggle-btn">Daftar sekarang</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ MAIN APP CONTAINER ════════ -->
+  <div id="app-container" class="app-wrapper hidden">
+    <!-- Sidebar (Desktop) -->
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i data-lucide="wallet" class="logo-icon"></i>
+          <span>Financier</span>
+        </div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <ul>
+          <li><a href="#" class="nav-link active" data-tab="overview"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></a></li>
+          <li><a href="#" class="nav-link" data-tab="transactions"><i data-lucide="arrow-left-right"></i><span>Transaksi</span></a></li>
+          <li><a href="#" class="nav-link" data-tab="accounts"><i data-lucide="credit-card"></i><span>Rekening</span></a></li>
+          <li><a href="#" class="nav-link" data-tab="budgets"><i data-lucide="pie-chart"></i><span>Anggaran</span></a></li>
+          <li><a href="#" class="nav-link" data-tab="reports"><i data-lucide="trending-up"></i><span>Laporan</span></a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="avatar" id="user-avatar-initial">U</div>
+          <div class="user-info">
+            <span class="user-name" id="user-display-name">User</span>
+            <span class="user-email" id="user-display-email">user@email.com</span>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-icon-text btn-danger-outline btn-block">
+          <i data-lucide="log-out"></i>
+          <span>Keluar</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Mobile Bottom Nav -->
+    <nav class="mobile-nav">
+      <a href="#" class="mobile-nav-link active" data-tab="overview"><i data-lucide="layout-dashboard"></i><span>Home</span></a>
+      <a href="#" class="mobile-nav-link" data-tab="transactions"><i data-lucide="arrow-left-right"></i><span>Transaksi</span></a>
+      <a href="#" class="mobile-nav-link" data-tab="accounts"><i data-lucide="credit-card"></i><span>Rekening</span></a>
+      <a href="#" class="mobile-nav-link" data-tab="budgets"><i data-lucide="pie-chart"></i><span>Budget</span></a>
+      <a href="#" class="mobile-nav-link" data-tab="reports"><i data-lucide="trending-up"></i><span>Laporan</span></a>
+      <a href="#" class="mobile-nav-link" id="mobile-menu-btn"><i data-lucide="user"></i><span>Profil</span></a>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="app-main-content">
+      
+      <!-- HEADER -->
+      <header class="app-header">
+        <div class="header-left">
+          <h1 id="page-title">Dashboard</h1>
+          <p id="page-subtitle" class="hidden-mobile">Ringkasan kondisi keuangan Anda</p>
+        </div>
+        <div class="header-right">
+          <button id="theme-toggle" class="btn-theme" title="Ganti Tema">
+            <i data-lucide="sun" class="sun-icon"></i>
+            <i data-lucide="moon" class="moon-icon"></i>
+          </button>
+          
+          <div class="quick-actions-dropdown">
+            <button class="btn btn-primary" id="btn-quick-action">
+              <i data-lucide="plus"></i>
+              <span>Tambah</span>
+            </button>
+            <div class="dropdown-menu hidden" id="quick-action-menu">
+              <a href="#" id="qa-add-income"><i data-lucide="arrow-down-left" class="color-income"></i> Pemasukan Baru</a>
+              <a href="#" id="qa-add-expense"><i data-lucide="arrow-up-right" class="color-expense"></i> Pengeluaran Baru</a>
+              <a href="#" id="qa-add-transfer"><i data-lucide="repeat" class="color-transfer"></i> Transfer Saldo</a>
+              <hr>
+              <a href="#" id="qa-add-account"><i data-lucide="credit-card"></i> Buat Rekening</a>
+              <a href="#" id="qa-add-budget"><i data-lucide="pie-chart"></i> Buat Anggaran</a>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- VIEW PANELS -->
+      <div class="panels-container">
+        
+        <!-- PANEL: OVERVIEW -->
+        <section id="panel-overview" class="view-panel">
+          <!-- Total Balance Cards Grid -->
+          <div class="grid-3 dashboard-cards">
+            <div class="card card-gradient-primary balance-main-card">
+              <div class="card-body">
+                <span class="card-label">Total Saldo Terkalkulasi</span>
+                <h2 class="card-value font-display" id="dash-total-balance">Rp0</h2>
+                <div class="balance-meta">
+                  <span id="dash-active-accounts-count">0 Rekening Aktif</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card border-glow-success">
+              <div class="card-body stat-body">
+                <div class="stat-icon background-success">
+                  <i data-lucide="trending-down" class="color-success"></i>
+                </div>
+                <div class="stat-content">
+                  <span class="card-label">Pemasukan Bulan Ini</span>
+                  <h3 class="card-value-sm color-success font-display" id="dash-monthly-income">Rp0</h3>
+                </div>
+              </div>
+            </div>
+
+            <div class="card border-glow-danger">
+              <div class="card-body stat-body">
+                <div class="stat-icon background-danger">
+                  <i data-lucide="trending-up" class="color-danger"></i>
+                </div>
+                <div class="stat-content">
+                  <span class="card-label">Pengeluaran Bulan Ini</span>
+                  <h3 class="card-value-sm color-danger font-display" id="dash-monthly-expense">Rp0</h3>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mid Section Grid: Accounts and Budgets -->
+          <div class="grid-2 mt-24">
+            <!-- Rekening Ringkasan -->
+            <div class="card">
+              <div class="card-header border-bottom">
+                <h3 class="card-title">Daftar Rekening</h3>
+                <a href="#" class="card-link-action" data-tab-go="accounts">Lihat Semua</a>
+              </div>
+              <div class="card-body pad-0 list-container" id="dash-accounts-list">
+                <div class="empty-state">
+                  <i data-lucide="credit-card"></i>
+                  <p>Belum ada rekening dibuat</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Budget Ringkasan -->
+            <div class="card">
+              <div class="card-header border-bottom">
+                <h3 class="card-title">Anggaran & Keuangan</h3>
+                <a href="#" class="card-link-action" data-tab-go="budgets">Lihat Semua</a>
+              </div>
+              <div class="card-body list-container" id="dash-budgets-list">
+                <div class="empty-state">
+                  <i data-lucide="pie-chart"></i>
+                  <p>Belum ada anggaran aktif</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Transactions Section -->
+          <div class="card mt-24">
+            <div class="card-header border-bottom">
+              <h3 class="card-title">Transaksi Terbaru</h3>
+              <a href="#" class="card-link-action" data-tab-go="transactions">Lihat Semua</a>
+            </div>
+            <div class="card-body pad-0">
+              <div class="table-responsive">
+                <table class="table" id="dash-transactions-table">
+                  <thead>
+                    <tr>
+                      <th>Transaksi</th>
+                      <th>Kategori</th>
+                      <th>Rekening</th>
+                      <th>Tanggal</th>
+                      <th class="text-right">Jumlah</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-transactions-body">
+                    <!-- Dynamic Rows -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="empty-state hidden" id="dash-transactions-empty">
+                <i data-lucide="arrow-left-right"></i>
+                <p>Belum ada transaksi tercatat</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PANEL: TRANSACTIONS -->
+        <section id="panel-transactions" class="view-panel hidden">
+          <div class="card">
+            <!-- Filter Bar -->
+            <div class="card-body border-bottom filter-bar">
+              <div class="filter-group">
+                <div class="form-control-icon">
+                  <i data-lucide="search"></i>
+                  <input type="text" id="filter-search" placeholder="Cari catatan/deskripsi...">
+                </div>
+                
+                <select id="filter-type">
+                  <option value="">Semua Jenis</option>
+                  <option value="income">Pemasukan</option>
+                  <option value="expense">Pengeluaran</option>
+                  <option value="transfer">Transfer</option>
+                </select>
+
+                <select id="filter-account">
+                  <option value="">Semua Rekening</option>
+                </select>
+
+                <select id="filter-category">
+                  <option value="">Semua Kategori</option>
+                </select>
+
+                <input type="date" id="filter-start-date" placeholder="Mulai">
+                <input type="date" id="filter-end-date" placeholder="Selesai">
+                
+                <button class="btn btn-outline" id="btn-reset-filters">Reset</button>
+              </div>
+            </div>
+            
+            <div class="card-body pad-0">
+              <div class="table-responsive">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Transaksi</th>
+                      <th>Kategori</th>
+                      <th>Rekening</th>
+                      <th>Tanggal</th>
+                      <th class="text-right">Jumlah</th>
+                      <th class="text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactions-list-body">
+                    <!-- Dynamic Rows -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="empty-state hidden" id="transactions-list-empty">
+                <i data-lucide="arrow-left-right"></i>
+                <p>Tidak ada transaksi yang cocok dengan filter</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PANEL: ACCOUNTS -->
+        <section id="panel-accounts" class="view-panel hidden">
+          <div class="grid-3" id="accounts-grid">
+            <!-- Dynamic Account Cards -->
+          </div>
+          <div class="empty-state hidden" id="accounts-empty">
+            <i data-lucide="credit-card"></i>
+            <p>Belum ada rekening dibuat. Tambahkan rekening baru untuk mulai mencatat keuangan.</p>
+            <button class="btn btn-primary mt-16" id="btn-add-account-empty">Tambah Rekening</button>
+          </div>
+        </section>
+
+        <!-- PANEL: BUDGETS -->
+        <section id="panel-budgets" class="view-panel hidden">
+          <div class="grid-2" id="budgets-grid">
+            <!-- Dynamic Budget Cards -->
+          </div>
+          <div class="empty-state hidden" id="budgets-empty">
+            <i data-lucide="pie-chart"></i>
+            <p>Belum ada anggaran bulanan dibuat. Atur anggaran untuk melacak pengeluaran Anda.</p>
+            <button class="btn btn-primary mt-16" id="btn-add-budget-empty">Buat Anggaran</button>
+          </div>
+        </section>
+
+        <!-- PANEL: REPORTS -->
+        <section id="panel-reports" class="view-panel hidden">
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-header border-bottom">
+                <h3 class="card-title">Perbandingan Bulanan</h3>
+              </div>
+              <div class="card-body chart-container">
+                <canvas id="chart-income-expense"></canvas>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header border-bottom">
+                <h3 class="card-title">Pengeluaran per Kategori</h3>
+              </div>
+              <div class="card-body chart-container">
+                <canvas id="chart-category-breakdown"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ════════ MODAL: REKENING ════════ -->
+  <div id="modal-account" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-account-title">Buat Rekening Baru</h3>
+        <button class="btn-close-modal" id="btn-close-account-modal"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-account">
+        <input type="hidden" id="account-edit-id">
+        
+        <div class="form-group">
+          <label for="account-name">Nama Rekening <span class="required">*</span></label>
+          <input type="text" id="account-name" placeholder="Contoh: Dompet Utama, Bank BCA" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="account-type">Jenis Rekening <span class="required">*</span></label>
+            <select id="account-type" required>
+              <option value="cash">Tunai (Cash)</option>
+              <option value="bank">Rekening Bank</option>
+              <option value="ewallet">Dompet Digital (E-Wallet)</option>
+              <option value="savings">Tabungan (Savings)</option>
+              <option value="investment">Investasi</option>
+            </select>
+          </div>
+          <div class="form-group col">
+            <label for="account-balance">Saldo Awal <span class="required">*</span></label>
+            <div class="input-currency">
+              <span class="currency-label">Rp</span>
+              <input type="number" id="account-balance" placeholder="0" min="0" required>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="account-bank-name">Nama Bank <span class="text-muted">(Opsional)</span></label>
+            <input type="text" id="account-bank-name" placeholder="Contoh: BCA, Mandiri">
+          </div>
+          <div class="form-group col">
+            <label for="account-number">Nomor Rekening <span class="text-muted">(Opsional)</span></label>
+            <input type="text" id="account-number" placeholder="123456789">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="account-color">Warna Kartu</label>
+            <div class="color-picker-grid">
+              <label class="color-radio" style="--color-theme: #00668A;"><input type="radio" name="account-color" value="#00668A" checked></label>
+              <label class="color-radio" style="--color-theme: #10B981;"><input type="radio" name="account-color" value="#10B981"></label>
+              <label class="color-radio" style="--color-theme: #8B5CF6;"><input type="radio" name="account-color" value="#8B5CF6"></label>
+              <label class="color-radio" style="--color-theme: #F59E0B;"><input type="radio" name="account-color" value="#F59E0B"></label>
+              <label class="color-radio" style="--color-theme: #EF4444;"><input type="radio" name="account-color" value="#EF4444"></label>
+              <label class="color-radio" style="--color-theme: #EC4899;"><input type="radio" name="account-color" value="#EC4899"></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" id="btn-cancel-account">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Rekening</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ════════ MODAL: TRANSAKSI ════════ -->
+  <div id="modal-transaction" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-transaction-title">Catat Transaksi</h3>
+        <button class="btn-close-modal" id="btn-close-transaction-modal"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-transaction">
+        <input type="hidden" id="transaction-edit-id">
+
+        <!-- Type Selector -->
+        <div class="transaction-type-segment">
+          <label class="type-btn active" data-type="expense">
+            <input type="radio" name="tx-type" value="expense" checked>
+            <i data-lucide="arrow-up-right"></i>
+            <span>Pengeluaran</span>
+          </label>
+          <label class="type-btn" data-type="income">
+            <input type="radio" name="tx-type" value="income">
+            <i data-lucide="arrow-down-left"></i>
+            <span>Pemasukan</span>
+          </label>
+          <label class="type-btn" data-type="transfer">
+            <input type="radio" name="tx-type" value="transfer">
+            <i data-lucide="repeat"></i>
+            <span>Transfer</span>
+          </label>
+        </div>
+
+        <div class="form-group mt-20">
+          <label for="tx-amount">Jumlah Transaksi <span class="required">*</span></label>
+          <div class="input-currency amount-large">
+            <span class="currency-label">Rp</span>
+            <input type="number" id="tx-amount" placeholder="0" min="1" required>
+          </div>
+        </div>
+
+        <div class="form-row mt-16">
+          <div class="form-group col" id="tx-source-account-group">
+            <label for="tx-account">Rekening Asal <span class="required">*</span></label>
+            <select id="tx-account" required>
+              <option value="" disabled selected>Pilih Rekening</option>
+            </select>
+          </div>
+          
+          <div class="form-group col hidden" id="tx-dest-account-group">
+            <label for="tx-transfer-to">Rekening Tujuan <span class="required">*</span></label>
+            <select id="tx-transfer-to">
+              <option value="" disabled selected>Pilih Rekening Tujuan</option>
+            </select>
+          </div>
+
+          <div class="form-group col" id="tx-category-group">
+            <label for="tx-category">Kategori <span class="required">*</span></label>
+            <select id="tx-category" required>
+              <option value="" disabled selected>Pilih Kategori</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="tx-date">Tanggal <span class="required">*</span></label>
+            <input type="date" id="tx-date" required>
+          </div>
+          <div class="form-group col">
+            <label for="tx-note">Catatan <span class="text-muted">(Opsional)</span></label>
+            <input type="text" id="tx-note" placeholder="Toko, keperluan, detail transaksi...">
+          </div>
+        </div>
+
+        <div class="modal-footer mt-20">
+          <button type="button" class="btn btn-outline" id="btn-cancel-transaction">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Transaksi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ════════ MODAL: ANGGARAN (BUDGET) ════════ -->
+  <div id="modal-budget" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-budget-title">Buat Anggaran Baru</h3>
+        <button class="btn-close-modal" id="btn-close-budget-modal"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-budget">
+        <div class="form-group">
+          <label for="budget-name">Nama Anggaran <span class="required">*</span></label>
+          <input type="text" id="budget-name" placeholder="Contoh: Belanja Bulanan, Jajan" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="budget-amount">Batas Anggaran Bulanan <span class="required">*</span></label>
+            <div class="input-currency">
+              <span class="currency-label">Rp</span>
+              <input type="number" id="budget-amount" placeholder="0" min="1" required>
+            </div>
+          </div>
+          <div class="form-group col">
+            <label for="budget-color">Warna Tampilan</label>
+            <div class="color-picker-grid">
+              <label class="color-radio" style="--color-theme: #10B981;"><input type="radio" name="budget-color" value="#10B981" checked></label>
+              <label class="color-radio" style="--color-theme: #EF4444;"><input type="radio" name="budget-color" value="#EF4444"></label>
+              <label class="color-radio" style="--color-theme: #F59E0B;"><input type="radio" name="budget-color" value="#F59E0B"></label>
+              <label class="color-radio" style="--color-theme: #3B82F6;"><input type="radio" name="budget-color" value="#3B82F6"></label>
+              <label class="color-radio" style="--color-theme: #EC4899;"><input type="radio" name="budget-color" value="#EC4899"></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Items Selection -->
+        <div class="form-group">
+          <label>Pilih Kategori Anggaran <span class="required">*</span></label>
+          <p class="form-help">Pengeluaran pada kategori yang dicentang akan otomatis dihitung dalam anggaran ini.</p>
+          <div class="budget-categories-list" id="budget-categories-selector">
+            <!-- List of expense categories with checkboxes -->
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" id="btn-cancel-budget">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Anggaran</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Mobile Profil Modal/Drawer -->
+  <div id="modal-mobile-menu" class="modal-overlay hidden">
+    <div class="modal-card drawer-card">
+      <div class="modal-header">
+        <h3>Profil & Pengaturan</h3>
+        <button class="btn-close-modal" id="btn-close-mobile-menu"><i data-lucide="x"></i></button>
+      </div>
+      <div class="drawer-body">
+        <div class="user-profile-badge-lg">
+          <div class="avatar" id="mobile-user-avatar">U</div>
+          <h3 id="mobile-user-name">User</h3>
+          <p id="mobile-user-email">user@email.com</p>
+        </div>
+        
+        <div class="settings-list mt-24">
+          <div class="settings-item">
+            <span>Tema Gelap</span>
+            <button id="mobile-theme-toggle" class="btn-theme-mobile">
+              <i data-lucide="moon"></i>
+            </button>
+          </div>
+        </div>
+
+        <button id="mobile-logout-btn" class="btn btn-danger btn-block mt-32">
+          <i data-lucide="log-out"></i>
+          <span>Keluar dari Akun</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
