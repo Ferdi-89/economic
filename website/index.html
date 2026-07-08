@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financier — Aplikasi Pencatatan Keuangan Pribadi</title>
+  <meta name="description" content="Aplikasi pencatatan keuangan modern, powerful, dan cepat. Multi rekening, budget bulanan, laporan grafik, offline-first, sinkronasi cloud. Gratis & open source." />
+  <meta name="keywords" content="financier, keuangan, budget, pencatatan keuangan, finansial tracker, aplikasi keuangan" />
+  <meta name="author" content="Financier" />
+  <meta property="og:title" content="Financier — Aplikasi Keuangan Pribadi" />
+  <meta property="og:description" content="Kelola keuanganmu dengan cerdas. Multi rekening, budget, laporan grafik, dan sinkronasi cloud." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://financier.vercel.app" />
+  <meta property="og:image" content="assets/icons/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Financier — Aplikasi Keuangan Pribadi" />
+  <meta name="twitter:description" content="Kelola keuanganmu dengan cerdas." />
+  <meta name="theme-color" content="#00668A" />
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main>
+    <!-- ═══ Hero ═══ -->
+    <section class="hero">
+      <div class="hero-bg"></div>
+      <div class="container">
+        <div class="hero-content">
+          <span class="badge">&#x1f4b0; Personal Finance Tracker</span>
+          <h1>Kelola keuanganmu <span class="gradient-text">dengan cerdas</span></h1>
+          <p>Financier membantu Anda mencatat pemasukan &amp; pengeluaran, mengatur budget bulanan, dan melihat laporan keuangan secara visual. Offline-first, sinkronasi cloud, gratis selamanya.</p>
+          <div class="hero-actions">
+            <a href="download.html" class="btn btn-primary btn-lg">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 1v12M6 9l4 4 4-4M3 14v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Download Gratis
+            </a>
+            <a href="features.html" class="btn btn-outline btn-lg">Lihat Fitur</a>
+          </div>
+          <div class="hero-meta">
+            <span>&#x2714;&#xfe0f; Android</span>
+            <span>&#x2714;&#xfe0f; Web PWA</span>
+            <span>&#x2714;&#xfe0f; Offline-first</span>
+            <span>&#x2714;&#xfe0f; Open Source</span>
+          </div>
+        </div>
+        <div class="hero-visual hidden-mobile">
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="phone-content">
+              <div class="mock-card balance-card">
+                <div class="mc-label">Saldo Bulan Ini</div>
+                <div class="mc-amount">Rp12.450.000</div>
+                <div class="mc-row">
+                  <span class="mc-income">&#x2191; Rp18.200.000</span>
+                  <span class="mc-expense">&#x2193; Rp5.750.000</span>
+                </div>
+              </div>
+              <div class="mock-card">
+                <div class="mc-label">Transaksi Terbaru</div>
+                <div class="tx-row">
+                  <div class="tx-icon" style="background:#E8F5E9;color:#2E7D32">&#x2193;</div>
+                  <div><div class="tx-name">Gaji Bulanan</div><div class="tx-date">1 Jul 2026</div></div>
+                  <div class="tx-amount" style="color:#2E7D32">+Rp8.000.000</div>
+                </div>
+                <div class="tx-row">
+                  <div class="tx-icon" style="background:#FFEBEE;color:#C62828">&#x2191;</div>
+                  <div><div class="tx-name">Indomaret</div><div class="tx-date">1 Jul 2026</div></div>
+                  <div class="tx-amount" style="color:#C62828">-Rp245.000</div>
+                </div>
+                <div class="tx-row">
+                  <div class="tx-icon" style="background:#FFEBEE;color:#C62828">&#x2191;</div>
+                  <div><div class="tx-name">Gojek</div><div class="tx-date">30 Jun 2026</div></div>
+                  <div class="tx-amount" style="color:#C62828">-Rp32.000</div>
+                </div>
+              </div>
+              <div class="mock-card" style="margin-top:auto">
+                <div class="mc-label" style="margin-bottom:0">Budget Bulanan</div>
+                <div style="display:flex;justify-content:space-between;font-size:0.75rem;font-weight:600;margin:8px 0 4px"><span>Makanan</span><span>60%</span></div>
+                <div style="height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden"><div style="width:60%;height:100%;background:var(--primary);border-radius:3px"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Stats ═══ -->
+    <section class="stats-bar">
+      <div class="container">
+        <div class="stat"><div class="stat-value">16</div><div class="stat-label">Kategori Transaksi</div></div>
+        <div class="stat"><div class="stat-value">10+</div><div class="stat-label">Fitur Utama</div></div>
+        <div class="stat"><div class="stat-value">100%</div><div class="stat-label">Offline Support</div></div>
+        <div class="stat"><div class="stat-value">MIT</div><div class="stat-label">Open Source</div></div>
+      </div>
+    </section>
+
+    <!-- ═══ Features summary ═══ -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <span class="badge">Fitur Unggulan</span>
+          <h2 class="heading-2">Semua yang Anda butuhkan <span class="gradient-text">mengatur keuangan</span></h2>
+          <p>Dari catatan transaksi harian hingga laporan keuangan bulanan, Financier hadir dengan fitur lengkap untuk kebutuhan finansial Anda.</p>
+        </div>
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-icon" style="background:#E3F2FD;color:#1565C0">&#x1f4b3;</div>
+            <h3 class="heading-3">Multi Rekening</h3>
+            <p>Cash, Bank, E-Wallet, Tabungan, Investasi — kelola semua saldo dalam satu tempat dengan tampilan terpisah.</p>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background:#E8F5E9;color:#2E7D32">&#x1f4c8;</div>
+            <h3 class="heading-3">Pemasukan &amp; Pengeluaran</h3>
+            <p>Catat setiap transaksi dengan kategori yang lengkap. Filter berdasarkan tanggal, kategori, atau rekening.</p>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background:#FFF3E0;color:#E65100">&#x1f4ca;</div>
+            <h3 class="heading-3">Budget Bulanan</h3>
+            <p>Atur anggaran per kategori dengan progress bar visual. Dapatkan notifikasi saat mendekati batas.</p>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background:#F3E5F5;color:#7B1FA2">&#x1f4d1;</div>
+            <h3 class="heading-3">Laporan Grafik</h3>
+            <p>Analisis tren keuangan 6 bulan terakhir dengan bar chart. Lihat breakdown pengeluaran per kategori.</p>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background:#E0F7FA;color:#00668A">&#x2601;&#xfe0f;</div>
+            <h3 class="heading-3">Sinkronasi Cloud</h3>
+            <p>Data tersimpan aman di Supabase PostgreSQL. Akses dari perangkat mana pun, kapan pun secara realtime.</p>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background:#F5F5F5;color:#424242">&#x1f5b1;&#xfe0f;</div>
+            <h3 class="heading-3">Offline-first</h3>
+            <p>Catat transaksi tanpa koneksi internet. Data disimpan lokal dan akan sinkron otomatis saat online.</p>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background:#E8EAF6;color:#283593">&#x1f504;</div>
+            <h3 class="heading-3">Transfer Rekening</h3>
+            <p>Pindahkan uang antar rekening dengan sekali ketuk. Riwayat transfer tercatat otomatis di kedua rekening.</p>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background:#FCE4EC;color:#880E4F">&#x1f3a8;</div>
+            <h3 class="heading-3">Dark Mode</h3>
+            <p>Nyaman di mata siang maupun malam. Otomatis mengikuti tema sistem atau bisa diatur manual.</p>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background:#E8F5E9;color:#1B5E20">&#x1f3e0;</div>
+            <h3 class="heading-3">Dashboard Ringkasan</h3>
+            <p>Lihat semua informasi penting di satu layar: saldo, transaksi terbaru, dan ringkasan bulanan.</p>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:40px">
+          <a href="features.html" class="btn btn-outline">Lihat Semua Fitur &#x2192;</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Tech stack ═══ -->
+    <section class="section" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)" id="tech">
+      <div class="container">
+        <div class="section-header">
+          <span class="badge">Tech Stack</span>
+          <h2 class="heading-2">Dibangun dengan <span class="gradient-text">teknologi modern</span></h2>
+          <p>Kombinasi teknologi terbaik untuk performa maksimal di Android dan Web.</p>
+        </div>
+        <div class="grid-3">
+          <div class="card" style="text-align:center;padding:32px 24px">
+            <div style="width:48px;height:48px;border-radius:12px;background:#027DFD10;color:#027DFD;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:1.25rem;margin:0 auto 12px">Fl</div>
+            <h3 class="heading-3">Flutter</h3>
+            <p style="font-size:0.875rem">UI framework cross-platform dari Google. Material 3, animasi halus, performa native.</p>
+          </div>
+          <div class="card" style="text-align:center;padding:32px 24px">
+            <div style="width:48px;height:48px;border-radius:12px;background:#3ECF8E10;color:#3ECF8E;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:1.25rem;margin:0 auto 12px">Sb</div>
+            <h3 class="heading-3">Supabase</h3>
+            <p style="font-size:0.875rem">Backend-as-a-Service. Auth, PostgreSQL, dan Realtime sync tanpa backend server.</p>
+          </div>
+          <div class="card" style="text-align:center;padding:32px 24px">
+            <div style="width:48px;height:48px;border-radius:12px;background:#00668A10;color:#00668A;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:1.25rem;margin:0 auto 12px">Rv</div>
+            <h3 class="heading-3">Riverpod</h3>
+            <p style="font-size:0.875rem">State management deklaratif. Type-safe, testable, dan efisien untuk aplikasi skala besar.</p>
+          </div>
+          <div class="card" style="text-align:center;padding:32px 24px">
+            <div style="width:48px;height:48px;border-radius:12px;background:#FF572210;color:#FF5722;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:1.25rem;margin:0 auto 12px">Hv</div>
+            <h3 class="heading-3">Hive</h3>
+            <p style="font-size:0.875rem">Database lokal super cepat. Mendukung offline-first dengan antrian sinkronasi.</p>
+          </div>
+          <div class="card" style="text-align:center;padding:32px 24px">
+            <div style="width:48px;height:48px;border-radius:12px;background:#F4433610;color:#F44336;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:1.25rem;margin:0 auto 12px">Fc</div>
+            <h3 class="heading-3">FL Chart</h3>
+            <p style="font-size:0.875rem">Library grafik interaktif untuk visualisasi data keuangan yang informatif dan menarik.</p>
+          </div>
+          <div class="card" style="text-align:center;padding:32px 24px">
+            <div style="width:48px;height:48px;border-radius:12px;background:#00000010;color:#000000;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:1.25rem;margin:0 auto 12px">Gr</div>
+            <h3 class="heading-3">GoRouter</h3>
+            <p style="font-size:0.875rem">Navigasi deklaratif dengan auth guard dan bottom navigation shell untuk UX mulus.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ CTA ═══ -->
+    <section class="cta" id="download">
+      <div class="cta-card">
+        <h2 class="heading-2">Siap mengatur keuangan?</h2>
+        <p>Download Financier sekarang dan mulai catat keuangan Anda dengan cara yang lebih cerdas. Gratis, tanpa iklan, open source.</p>
+        <div class="cta-buttons">
+          <a href="download.html" class="btn btn-primary btn-lg">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Aplikasi
+          </a>
+          <a href="docs.html" class="btn btn-outline btn-lg">Dokumentasi</a>
+        </div>
+        <p class="cta-note">&#x2714;&#xfe0f; Gratis &middot; &#x1f512; Open Source (MIT) &middot; &#x1f6ab; Tanpa Iklan</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+  <script src="assets/js/include.js"></script>
+</body>
+</html>
