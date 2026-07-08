@@ -601,9 +601,12 @@ select option { background: var(--bg-overlay); color: var(--text-primary); }
   width: 28px; height: 28px;
   border-radius: var(--radius);
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; flex-shrink: 0;
-  background: var(--bg-elevated) !important;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
 }
+.mini-icon.income { background: var(--green-subtle); color: var(--green); }
+.mini-icon.expense { background: var(--red-subtle); color: var(--red); }
+.mini-icon.transfer { background: var(--amber-subtle); color: var(--amber); }
 .mini-info { flex: 1; min-width: 0; }
 .mini-title {
   font-size: 12.5px; font-weight: 600;
@@ -653,12 +656,12 @@ select option { background: var(--bg-overlay); color: var(--text-primary); }
 .tx-type-badge {
   width: 32px; height: 32px; border-radius: var(--radius);
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-size: 13px;
+  flex-shrink: 0;
   background: var(--bg-elevated);
 }
-.tx-type-badge.income { color: var(--green); }
-.tx-type-badge.expense { color: var(--red); }
-.tx-type-badge.transfer { color: var(--amber); }
+.tx-type-badge.income { background: var(--green-subtle); color: var(--green); }
+.tx-type-badge.expense { background: var(--red-subtle); color: var(--red); }
+.tx-type-badge.transfer { background: var(--amber-subtle); color: var(--amber); }
 .tx-body { flex: 1; min-width: 0; }
 .tx-note { font-size: 13px; font-weight: 600; color: var(--text-primary); }
 .tx-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
