@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kebijakan Privasi — Financier</title>
+  <meta name="description" content="Kebijakan privasi Financier. Aplikasi pencatatan keuangan pribadi yang menghormati data pengguna." />
+  <meta name="theme-color" content="#00668A" />
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main>
+    <section class="page-header">
+      <div class="container">
+        <span class="badge">&#x1f6e1;&#xfe0f; Privasi</span>
+        <h1 class="heading-1">Kebijakan <span class="gradient-text">Privasi</span></h1>
+        <p>Financier menghormati privasi Anda. Berikut bagaimana data Anda dikelola.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container container-sm content-section">
+        <p><em>Terakhir diperbarui: Juli 2026</em></p>
+
+        <h2>Data yang Dikumpulkan</h2>
+        <p>Financier mengumpulkan data minimal yang diperlukan untuk berfungsi:</p>
+        <ul>
+          <li><strong>Akun:</strong> Alamat email dan nama (untuk autentikasi)</li>
+          <li><strong>Data Keuangan:</strong> Transaksi, saldo rekening, kategori, budget yang Anda masukkan secara manual</li>
+          <li><strong>Preferensi:</strong> Tema (terang/gelap/sistem) yang disimpan di perangkat lokal</li>
+        </ul>
+
+        <h2>Data yang Tidak Dikumpulkan</h2>
+        <ul>
+          <li>&#x2714;&#xfe0f; Tidak ada data lokasi</li>
+          <li>&#x2714;&#xfe0f; Tidak ada data kontak</li>
+          <li>&#x2714;&#xfe0f; Tidak ada data biometrik</li>
+          <li>&#x2714;&#xfe0f; Tidak ada pelacakan iklan</li>
+          <li>&#x2714;&#xfe0f; Tidak ada analytics pihak ketiga</li>
+          <li>&#x2714;&#xfe0f; Tidak ada cookie</li>
+        </ul>
+
+        <h2>Penyimpanan Data</h2>
+        <p>Data Anda disimpan di dua tempat:</p>
+        <ul>
+          <li><strong>Lokal (Perangkat Anda):</strong> Database Hive di perangkat Android atau IndexedDB di browser. Data tetap bisa diakses tanpa koneksi internet.</li>
+          <li><strong>Cloud (Supabase):</strong> Database PostgreSQL dihosting oleh Supabase dengan Row Level Security (RLS). Hanya Anda yang bisa mengakses data Anda.</li>
+        </ul>
+
+        <h2>Keamanan</h2>
+        <ul>
+          <li>Autentikasi menggunakan Supabase Auth (email/password atau Google OAuth)</li>
+          <li>Semua koneksi menggunakan HTTPS</li>
+          <li>Row Level Security memastikan data hanya bisa diakses oleh pemiliknya</li>
+          <li>Kami tidak pernah melihat atau mengakses data pengguna</li>
+          <li>Kode sumber terbuka (open source) untuk audit keamanan</li>
+        </ul>
+
+        <h2>Kontrol Data Anda</h2>
+        <ul>
+          <li><strong>Ekspor:</strong> Fitur ekspor data akan segera tersedia</li>
+          <li><strong>Edit &amp; Hapus:</strong> Semua data bisa diedit atau dihapus langsung dari aplikasi</li>
+          <li><strong>Hapus Akun:</strong> Hapus akun kapan saja melalui pengaturan</li>
+        </ul>
+
+        <h2>Layanan Pihak Ketiga</h2>
+        <p>Financier menggunakan layanan berikut:</p>
+        <ul>
+          <li><strong>Supabase</strong> — Penyedia backend (auth, database, realtime). <a href="https://supabase.com/privacy" target="_blank">Kebijakan privasi Supabase</a></li>
+          <li><strong>Google</strong> — OAuth login (opsional). <a href="https://policies.google.com/privacy" target="_blank">Kebijakan privasi Google</a></li>
+        </ul>
+
+        <h2>Perubahan Kebijakan</h2>
+        <p>Kebijakan privasi ini dapat diperbarui dari waktu ke waktu. Perubahan akan diumumkan melalui halaman ini dan/atau melalui aplikasi.</p>
+
+        <h2>Kontak</h2>
+        <p>Jika ada pertanyaan tentang kebijakan privasi ini, silakan buka issue di <a href="https://github.com/Ferdi-89/economic" target="_blank">GitHub repository</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+  <script src="assets/js/include.js"></script>
+</body>
+</html>
