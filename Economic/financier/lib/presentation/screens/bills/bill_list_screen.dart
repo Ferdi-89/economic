@@ -79,82 +79,108 @@ class BillListScreen extends ConsumerWidget {
                   final overdue = !b.isPaid && b.dueDate.isBefore(DateTime.now());
                   return Card(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Checkbox(
-                            value: b.isPaid,
-                            onChanged: (_) => _toggleStatus(context, ref, b),
-                          ),
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () => _toggleStatus(context, ref, b),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: b.isPaid
-                                        ? AppColors.success.withValues(alpha: 0.1)
-                                        : (overdue ? AppColors.error.withValues(alpha: 0.1) : theme.colorScheme.primaryContainer),
-                                    child: Icon(
-                                      b.isPaid ? Icons.check : Icons.schedule,
-                                      color: b.isPaid ? AppColors.success : (overdue ? AppColors.error : theme.colorScheme.primary),
-                                      size: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          b.name,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                            decoration: b.isPaid ? TextDecoration.lineThrough : null,
-                                            color: b.isPaid ? theme.colorScheme.onSurfaceVariant : null,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Jatuh tempo: ${DateFormat('dd MMM yyyy', 'id').format(b.dueDate)}',
-                                          style: TextStyle(
-                                            color: overdue ? AppColors.error : theme.colorScheme.onSurfaceVariant,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Text(
-                                    'Rp${fmt.format(b.amount.toInt())}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: b.isPaid ? AppColors.success : theme.colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ],
+                          // Top Row: Status checkbox, name, amount
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: b.isPaid,
+                                onChanged: (_) => _toggleStatus(context, ref, b),
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  b.name,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    decoration: b.isPaid ? TextDecoration.lineThrough : null,
+                                    color: b.isPaid ? theme.colorScheme.onSurfaceVariant : null,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Rp${fmt.format(b.amount.toInt())}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: b.isPaid ? AppColors.success : theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          if (!b.isPaid)
-                            IconButton(
-                              icon: const Icon(Icons.snooze, size: 18),
-                              tooltip: 'Tunda 7 Hari',
-                              onPressed: () => _postponeBill(context, ref, b),
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            tooltip: 'Edit',
-                            onPressed: () => _showEditDialog(context, ref, b),
+                          const SizedBox(height: 8),
+                          // Middle Row: Due date & status icon
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 10,
+                                backgroundColor: b.isPaid
+                                    ? AppColors.success.withValues(alpha: 0.1)
+                                    : (overdue ? AppColors.error.withValues(alpha: 0.1) : theme.colorScheme.primaryContainer),
+                                child: Icon(
+                                  b.isPaid ? Icons.check : Icons.schedule,
+                                  color: b.isPaid ? AppColors.success : (overdue ? AppColors.error : theme.colorScheme.primary),
+                                  size: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Jatuh tempo: ${DateFormat('dd MMM yyyy', 'id').format(b.dueDate)}',
+                                style: TextStyle(
+                                  color: overdue ? AppColors.error : theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                  fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: Icon(Icons.delete_outline, color: theme.colorScheme.error, size: 18),
-                            tooltip: 'Hapus',
-                            onPressed: () => _deleteBill(context, ref, b),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 8),
+                          // Bottom Row: Action buttons aligned to the right
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (!b.isPaid) ...[
+                                TextButton.icon(
+                                  onPressed: () => _postponeBill(context, ref, b),
+                                  icon: const Icon(Icons.snooze, size: 16),
+                                  label: const Text('Tunda 7 Hari', style: TextStyle(fontSize: 12)),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                              ],
+                              TextButton.icon(
+                                onPressed: () => _showEditDialog(context, ref, b),
+                                icon: const Icon(Icons.edit_outlined, size: 16),
+                                label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              TextButton.icon(
+                                onPressed: () => _deleteBill(context, ref, b),
+                                icon: Icon(Icons.delete_outline, color: theme.colorScheme.error, size: 16),
+                                label: Text('Hapus', style: TextStyle(color: theme.colorScheme.error, fontSize: 12)),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

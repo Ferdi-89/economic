@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config/supabase_config.dart';
 import '../../../data/repositories/auth_repository.dart';
+import 'package:uuid/uuid.dart';
 
 class WishlistItem {
   final String id;
@@ -173,16 +174,12 @@ class WishlistNotifier extends StateNotifier<List<WishlistItem>> {
 
   void add(String name, double price, [String? url]) {
     final newItem = WishlistItem(
-      id: SupabaseConfig.client.auth.currentUser != null
-          ? null as dynamic // Let database generate UUID if online, otherwise use timestamp
-          : DateTime.now().millisecondsSinceEpoch.toString(),
+      id: const Uuid().v4(),
       name: name,
       price: price,
       url: url != null && url.trim().isNotEmpty ? url.trim() : null,
     );
-    // If online, we let the database save generate its ID. But for local list first:
-    final localId = DateTime.now().millisecondsSinceEpoch.toString();
-    state = [...state, newItem.copyWith(id: newItem.id ?? localId)];
+    state = [...state, newItem];
     _save();
   }
 
