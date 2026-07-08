@@ -66,6 +66,7 @@ class AccountListScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     return Card(
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primaryContainer,
           child: Icon(_icon(acc.type), color: theme.colorScheme.primary),

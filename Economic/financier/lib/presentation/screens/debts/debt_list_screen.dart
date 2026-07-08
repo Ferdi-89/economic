@@ -72,7 +72,7 @@ class DebtListScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(16),
                   onTap: () => _toggleStatus(context, ref, d),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(children: [
                       Checkbox(value: d.isPaid, onChanged: (_) => _toggleStatus(context, ref, d)),
                       CircleAvatar(
