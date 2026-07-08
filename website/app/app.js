@@ -4,7 +4,7 @@
 const SUPABASE_URL = 'https://mgyohqvbcpripmkgipvs.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_p0NuPgDrOUq8quIw1PFflg__T3UXHhz';
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 2. Global State Variables
 let currentUser = null;
