@@ -464,13 +464,49 @@ $('form-tx').addEventListener('submit', async e => {
   showLoader();
   try {
     if (editId) {
+      const oldTx = TRANSACTIONS.find(t => t.id === editId);
       await sb.from('transactions').update({ type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, notes }).eq('id', editId);
+      
+      if (oldTx) {
+        // 1. Revert old transaction effect on account balances
+        const oldAcc = ACCOUNTS.find(a => a.id === oldTx.account_id);
+        if (oldAcc) {
+          let revDelta = oldTx.type === 'income' ? -oldTx.amount : oldTx.amount;
+          let newBal = (oldAcc.balance || 0) + revDelta;
+          await sb.from('accounts').update({ balance: newBal }).eq('id', oldTx.account_id);
+          oldAcc.balance = newBal; // Temporarily update local reference
+        }
+        if (oldTx.type === 'transfer' && oldTx.transfer_to_account_id) {
+          const oldToAcc = ACCOUNTS.find(a => a.id === oldTx.transfer_to_account_id);
+          if (oldToAcc) {
+            let newBal = (oldToAcc.balance || 0) - oldTx.amount;
+            await sb.from('accounts').update({ balance: newBal }).eq('id', oldTx.transfer_to_account_id);
+            oldToAcc.balance = newBal;
+          }
+        }
+        
+        // Reload ACCOUNTS to fetch latest modified balances
+        await fetchAccounts();
+        
+        // 2. Apply new transaction effect on account balances
+        const newAcc = ACCOUNTS.find(a => a.id === accountId);
+        if (newAcc) {
+          let newDelta = type === 'income' ? amount : -amount;
+          await sb.from('accounts').update({ balance: (newAcc.balance || 0) + newDelta }).eq('id', accountId);
+        }
+        if (type === 'transfer' && toAccId) {
+          const newToAcc = ACCOUNTS.find(a => a.id === toAccId);
+          if (newToAcc) {
+            await sb.from('accounts').update({ balance: (newToAcc.balance || 0) + amount }).eq('id', toAccId);
+          }
+        }
+      }
     } else {
       await sb.from('transactions').insert({ user_id: USER.id, type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, notes });
       // Update balance
       const account = ACCOUNTS.find(a => a.id === accountId);
       if (account) {
-        const delta = type === 'income' ? amount : type === 'expense' ? -amount : -amount;
+        const delta = type === 'income' ? amount : -amount;
         await sb.from('accounts').update({ balance: (account.balance || 0) + delta }).eq('id', accountId);
         if (type === 'transfer' && toAccId) {
           const toAcc = ACCOUNTS.find(a => a.id === toAccId);
