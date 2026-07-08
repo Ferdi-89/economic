@@ -6,7 +6,7 @@ part 'category.g.dart';
 class Category with _$Category {
   const factory Category({
     required String id,
-    required String userId,
+    String? userId,
     required String name,
     required String type, // income or expense
     String? icon,
