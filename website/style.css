@@ -861,7 +861,7 @@ select option { background: var(--bg-overlay); color: var(--text-primary); }
   font-size: 15px; font-weight: 700;
   color: var(--text-primary);
 }
-.modal-close {
+.modal-close-icon {
   width: 24px; height: 24px;
   border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
@@ -869,7 +869,7 @@ select option { background: var(--bg-overlay); color: var(--text-primary); }
   color: var(--text-muted);
   transition: all 0.1s;
 }
-.modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+.modal-close-icon:hover { background: var(--bg-hover); color: var(--text-primary); }
 .modal-body { padding: 16px 18px; }
 .modal-foot {
   display: flex; justify-content: flex-end; gap: 8px;
