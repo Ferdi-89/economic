@@ -640,8 +640,12 @@ function setTxType(type) {
     t.classList.toggle('active', t.dataset.type === type);
     t.querySelector('input').checked = t.dataset.type === type;
   });
-  $('tx-to-field').style.display  = type === 'transfer' ? '' : 'none';
-  $('tx-cat-field').style.display = type === 'transfer' ? 'none' : '';
+  const isTransfer = type === 'transfer';
+  $('tx-to-field').style.display  = isTransfer ? '' : 'none';
+  $('tx-cat-field').style.display = isTransfer ? 'none' : '';
+  
+  $('tx-category').required = !isTransfer;
+  $('tx-to-account').required = isTransfer;
   
   // Rebuild category options dynamically (works 100% on Safari, Chrome, and Mobile browsers)
   const filteredCats = CATEGORIES.filter(c => 

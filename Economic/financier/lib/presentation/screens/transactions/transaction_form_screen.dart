@@ -95,7 +95,7 @@ class TransactionFormNotifier extends ChangeNotifier {
   }
 
   Future<void> submit() async {
-    if (accountId == null || categoryId == null || amount <= 0) return;
+    if (accountId == null || (type != 'transfer' && categoryId == null) || (type == 'transfer' && transferToAccountId == null) || amount <= 0) return;
     loading = true;
     notifyListeners();
     try {
@@ -211,21 +211,23 @@ class TransactionFormScreen extends ConsumerWidget {
                 fmt: fmt,
               ),
             ],
-            const SizedBox(height: 20),
-            DropdownButtonFormField<String>(
-              value: form.categoryId,
-              decoration: const InputDecoration(
-                  labelText: 'Kategori',
-                  prefixIcon: Icon(Icons.category)),
-              items: form.filteredCategories
-                  .map((c) => DropdownMenuItem(
-                      value: c.id, child: Text(c.name)))
-                  .toList(),
-              onChanged: (v) {
-                form.categoryId = v;
-                form.notifyListeners();
-              },
-            ),
+            if (form.type != 'transfer') ...[
+              const SizedBox(height: 20),
+              DropdownButtonFormField<String>(
+                value: form.categoryId,
+                decoration: const InputDecoration(
+                    labelText: 'Kategori',
+                    prefixIcon: Icon(Icons.category)),
+                items: form.filteredCategories
+                    .map((c) => DropdownMenuItem(
+                        value: c.id, child: Text(c.name)))
+                    .toList(),
+                onChanged: (v) {
+                  form.categoryId = v;
+                  form.notifyListeners();
+                },
+              ),
+            ],
             const SizedBox(height: 20),
             TextFormField(
               key: ValueKey(form.editingId != null ? 'edit_note_${form.note}' : 'new_note'),
