@@ -8,7 +8,7 @@ class Transaction with _$Transaction {
     required String id,
     required String userId,
     required String accountId,
-    required String categoryId,
+    String? categoryId,
     required String type, // income, expense, transfer
     required double amount,
     required DateTime date,
