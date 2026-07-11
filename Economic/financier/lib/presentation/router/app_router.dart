@@ -50,6 +50,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: listenable,
     redirect: (context, state) {
       final isLoggedIn = authRepo.isAuthenticated;
+
+      // Handle deep links from launcher widget
+      if (state.uri.scheme == 'financier') {
+        var path = state.uri.path;
+        if (state.uri.host.isNotEmpty) {
+          path = '/${state.uri.host}$path';
+        }
+        final query = state.uri.query.isNotEmpty ? '?${state.uri.query}' : '';
+        return '$path$query';
+      }
+
       final isAuthRoute = state.matchedLocation.startsWith('/login') ||
           state.matchedLocation.startsWith('/register');
 
@@ -80,7 +91,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               builder: (_, __) => const TransactionListScreen()),
           GoRoute(
               path: '/transactions/add',
-              builder: (_, __) => const TransactionFormScreen()),
+              builder: (_, state) => TransactionFormScreen(
+                    type: state.uri.queryParameters['type'],
+                  )),
           GoRoute(
               path: '/transactions/edit/:id',
               builder: (_, state) =>

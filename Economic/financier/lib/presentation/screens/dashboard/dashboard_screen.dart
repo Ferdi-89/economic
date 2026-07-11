@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -28,6 +31,7 @@ final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async 
   final billRepo = ref.read(billRepositoryProvider);
   final goalRepo = ref.read(savingGoalRepositoryProvider);
   final debtRepo = ref.read(debtRepositoryProvider);
+  final catRepo = ref.read(categoryRepositoryProvider);
 
   final now = DateTime.now();
   final startOfMonth = DateTime(now.year, now.month, 1);
@@ -41,36 +45,43 @@ final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async 
     billRepo.getAll(userId),
     goalRepo.getAll(userId),
     debtRepo.getAll(userId),
+    catRepo.getAll(userId),
   ]);
 
   return DashboardData(
     recentTransactions: (results[0] as List<Transaction>).take(5).toList(),
+    allTransactions: results[0] as List<Transaction>,
     monthlyIncome: results[1] as double,
     monthlyExpense: results[2] as double,
     accounts: results[3] as List<Account>,
     bills: results[4] as List<Bill>,
     savingGoals: results[5] as List<SavingGoal>,
     debts: results[6] as List<Debt>,
+    categories: results[7] as List<Category>,
   );
 });
 
 class DashboardData {
   final List<Transaction> recentTransactions;
+  final List<Transaction> allTransactions;
   final double monthlyIncome;
   final double monthlyExpense;
   final List<Account> accounts;
   final List<Bill> bills;
   final List<SavingGoal> savingGoals;
   final List<Debt> debts;
+  final List<Category> categories;
 
   DashboardData({
     required this.recentTransactions,
+    required this.allTransactions,
     required this.monthlyIncome,
     required this.monthlyExpense,
     required this.accounts,
     required this.bills,
     required this.savingGoals,
     required this.debts,
+    required this.categories,
   });
 
   double get balance => monthlyIncome - monthlyExpense;
@@ -131,14 +142,16 @@ class DashboardScreen extends ConsumerWidget {
       body: data.when(
         loading: () => _buildLoading(),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (d) => RefreshIndicator(
-          onRefresh: () => ref.refresh(dashboardProvider.future),
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            children: [
-              _buildBalanceCard(context, d, isSimulationActive, simulatedDeduction),
-              const SizedBox(height: 20),
-              Row(
+        data: (d) {
+          _updateWidgetData(d);
+          return RefreshIndicator(
+            onRefresh: () => ref.refresh(dashboardProvider.future),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              children: [
+                _buildBalanceCard(context, d, isSimulationActive, simulatedDeduction),
+                const SizedBox(height: 20),
+                Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Transaksi Terbaru',
@@ -180,10 +193,13 @@ class DashboardScreen extends ConsumerWidget {
               _buildAccountsRow(context, d, ref, isSimulationActive, simulatedDeduction),
               const SizedBox(height: 20),
               _buildMonthlyOverview(context, d),
+              const SizedBox(height: 20),
+              _buildTopSpendingCategories(context, d),
               const SizedBox(height: 24),
             ],
           ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -663,6 +679,195 @@ class DashboardScreen extends ConsumerWidget {
         'savings' => Icons.savings,
         _ => Icons.credit_card,
       };
+
+  Future<void> _updateWidgetData(DashboardData d) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      final actualBalance = d.accounts.fold<double>(0, (sum, acc) => sum + acc.balance);
+      final totalLoans = d.debts.where((debt) => debt.type == 'loan' && debt.status == 'unpaid').fold<double>(0, (sum, debt) => sum + debt.amount);
+      final totalDebts = d.debts.where((debt) => debt.type == 'debt' && debt.status == 'unpaid').fold<double>(0, (sum, debt) => sum + debt.amount);
+      final netWorth = actualBalance + totalLoans - totalDebts;
+
+      await prefs.setInt('net_worth', netWorth.toInt());
+      await prefs.setInt('monthly_income', d.monthlyIncome.toInt());
+      await prefs.setInt('monthly_expense', d.monthlyExpense.toInt());
+
+      // Serialize recent transactions to JSON for the list widget
+      final txListJson = d.recentTransactions.map((tx) {
+        final category = d.categories.firstWhere(
+          (c) => c.id == tx.categoryId,
+          orElse: () => Category(id: '', name: 'Lainnya', type: '', createdAt: DateTime.now()),
+        );
+        return {
+          'title': tx.note ?? tx.description ?? 'Transaksi',
+          'amount': tx.amount.toInt(),
+          'type': tx.type,
+          'category': category.name,
+        };
+      }).toList();
+      await prefs.setString('recent_transactions', jsonEncode(txListJson));
+
+      // Invoke Android update via MethodChannel
+      const MethodChannel('com.financier.app/widget').invokeMethod('updateWidget');
+    } catch (_) {}
+  }
+
+  Widget _buildTopSpendingCategories(BuildContext context, DashboardData d) {
+    final theme = Theme.of(context);
+    final fmt = NumberFormat('#,###', 'id_ID');
+
+    final expenseTxs = d.allTransactions.where((tx) => tx.type == 'expense').toList();
+    if (expenseTxs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final Map<String, double> categorySums = {};
+    for (final tx in expenseTxs) {
+      if (tx.categoryId != null) {
+        categorySums[tx.categoryId!] = (categorySums[tx.categoryId!] ?? 0) + tx.amount;
+      }
+    }
+
+    if (categorySums.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final sortedCategories = categorySums.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final categoriesMap = {for (final c in d.categories) c.id: c};
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Pengeluaran Terbesar',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ...sortedCategories.take(4).map((entry) {
+              final cat = categoriesMap[entry.key];
+              final catName = cat?.name ?? 'Lainnya';
+              final catIcon = cat?.icon;
+              final catColor = _categoryColor(cat?.color, catName);
+              final amount = entry.value;
+              final percentage = d.monthlyExpense > 0 ? (amount / d.monthlyExpense) : 0.0;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: catColor.withValues(alpha: 0.1),
+                          child: Icon(_categoryIcon(catIcon), color: catColor, size: 16),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            catName,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ),
+                        Text(
+                          'Rp${fmt.format(amount.toInt())}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: percentage,
+                              backgroundColor: Colors.grey[200],
+                              color: catColor,
+                              minHeight: 6,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 32,
+                          child: Text(
+                            '${(percentage * 100).toInt()}%',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _categoryIcon(String? iconName) => switch (iconName) {
+        'restaurant' => Icons.restaurant,
+        'directions_car' => Icons.directions_car,
+        'shopping_cart' => Icons.shopping_cart,
+        'receipt' => Icons.receipt,
+        'movie' => Icons.movie,
+        'local_hospital' => Icons.local_hospital,
+        'school' => Icons.school,
+        'home' => Icons.home,
+        'trending_up' => Icons.trending_up,
+        'work' => Icons.work,
+        'code' => Icons.code,
+        'store' => Icons.store,
+        'card_giftcard' => Icons.card_giftcard,
+        _ => Icons.category,
+      };
+
+  Color _categoryColor(String? colorStr, String categoryName) {
+    if (colorStr != null && colorStr.isNotEmpty) {
+      try {
+        final hex = colorStr.replaceAll('#', '');
+        return Color(int.parse('FF$hex', radix: 16));
+      } catch (_) {}
+    }
+    final name = categoryName.toLowerCase();
+    if (name.contains('makanan') || name.contains('minuman') || name.contains('eat') || name.contains('food')) return Colors.orange;
+    if (name.contains('transport')) return Colors.blue;
+    if (name.contains('belanja') || name.contains('shop')) return Colors.pink;
+    if (name.contains('tagihan') || name.contains('bill') || name.contains('utilitas')) return Colors.amber;
+    if (name.contains('hiburan') || name.contains('movie') || name.contains('play')) return Colors.purple;
+    if (name.contains('sehat') || name.contains('medical') || name.contains('health')) return Colors.red;
+    if (name.contains('didik') || name.contains('school') || name.contains('educat')) return Colors.indigo;
+    if (name.contains('rumah') || name.contains('home') || name.contains('tinggal')) return Colors.teal;
+    if (name.contains('invest') || name.contains('saham')) return Colors.cyan;
+    if (name.contains('gaji') || name.contains('salary')) return Colors.green;
+    if (name.contains('freelance')) return Colors.lightGreen;
+    if (name.contains('bisnis') || name.contains('store')) return Colors.deepPurple;
+    if (name.contains('hadiah') || name.contains('gift')) return Colors.pinkAccent;
+    return Colors.blueGrey;
+  }
 
   Widget _buildLoading() {
     return Shimmer.fromColors(

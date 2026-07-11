@@ -4,7 +4,16 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/bill_repository.dart';
+import '../../../data/repositories/account_repository.dart';
+import '../../../data/repositories/category_repository.dart';
+import '../../../data/repositories/transaction_repository.dart';
 import '../../../data/models/bill.dart';
+import '../../../data/models/account.dart';
+import '../../../data/models/category.dart';
+import '../dashboard/dashboard_screen.dart';
+import '../transactions/transaction_list_screen.dart';
+import '../accounts/account_list_screen.dart';
+import '../reports/report_screen.dart';
 
 final _billListProvider =
     FutureProvider.autoDispose<List<Bill>>((ref) async {
@@ -200,9 +209,167 @@ class BillListScreen extends ConsumerWidget {
   }
 
   Future<void> _toggleStatus(BuildContext context, WidgetRef ref, Bill bill) async {
-    final newStatus = bill.isPaid ? 'pending' : 'paid';
-    await ref.read(billRepositoryProvider).update(bill.id, {'status': newStatus});
-    ref.invalidate(_billListProvider);
+    if (bill.isPaid) {
+      // Revert status to pending (unpaid)
+      try {
+        await ref.read(billRepositoryProvider).update(bill.id, {'status': 'pending'});
+        ref.invalidate(_billListProvider);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Status tagihan "${bill.name}" diubah menjadi belum dibayar.')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal mengubah status: $e')),
+          );
+        }
+      }
+      return;
+    }
+
+    // Mark as paid - retrieve accounts and categories first
+    final userId = ref.read(authRepositoryProvider).currentUser!.id;
+    final accountRepo = ref.read(accountRepositoryProvider);
+    final categoryRepo = ref.read(categoryRepositoryProvider);
+
+    try {
+      final accountsList = await accountRepo.getAll(userId);
+      final categoriesList = await categoryRepo.getAll(userId, type: 'expense');
+
+      if (accountsList.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Anda belum memiliki rekening. Silakan buat rekening terlebih dahulu.')),
+          );
+        }
+        return;
+      }
+
+      if (!context.mounted) return;
+
+      // Define default selections
+      String? selectedAccountId = accountsList.first.id;
+      String? selectedCategoryId = categoriesList.where(
+        (c) => c.name.toLowerCase().contains('tagihan') || c.name.toLowerCase().contains('bill'),
+      ).firstOrNull?.id ?? (categoriesList.isNotEmpty ? categoriesList.first.id : null);
+
+      await showDialog(
+        context: context,
+        builder: (dCtx) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text('Bayar Tagihan: ${bill.name}'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Jumlah: Rp${NumberFormat('#,###', 'id_ID').format(bill.amount.toInt())}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedAccountId,
+                      decoration: const InputDecoration(
+                        labelText: 'Rekening Sumber',
+                        prefixIcon: Icon(Icons.account_balance_wallet),
+                      ),
+                      items: accountsList.map((acc) {
+                        return DropdownMenuItem(
+                          value: acc.id,
+                          child: Text('${acc.name} (Rp${NumberFormat('#,###', 'id_ID').format(acc.balance.toInt())})'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          selectedAccountId = val;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedCategoryId,
+                      decoration: const InputDecoration(
+                        labelText: 'Kategori Pengeluaran',
+                        prefixIcon: Icon(Icons.category),
+                      ),
+                      items: categoriesList.map((cat) {
+                        return DropdownMenuItem(
+                          value: cat.id,
+                          child: Text(cat.name),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          selectedCategoryId = val;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dCtx),
+                    child: const Text('Batal'),
+                  ),
+                  FilledButton(
+                    onPressed: selectedAccountId == null ? null : () async {
+                      Navigator.pop(dCtx);
+                      try {
+                        // 1. Create transaction (expense mutation)
+                        await ref.read(transactionRepositoryProvider).create({
+                          'user_id': userId,
+                          'account_id': selectedAccountId,
+                          'category_id': selectedCategoryId,
+                          'type': 'expense',
+                          'amount': bill.amount,
+                          'date': DateTime.now().toIso8601String().split('T')[0],
+                          'note': 'Pembayaran Tagihan: ${bill.name}',
+                          'created_at': DateTime.now().toIso8601String(),
+                          'updated_at': DateTime.now().toIso8601String(),
+                        });
+
+                        // 2. Update bill status to paid
+                        await ref.read(billRepositoryProvider).update(bill.id, {'status': 'paid'});
+
+                        // 3. Invalidate/Refresh all affected states
+                        ref.invalidate(_billListProvider);
+                        ref.invalidate(dashboardProvider);
+                        ref.invalidate(txListProvider(userId));
+                        ref.invalidate(accountListProvider);
+                        ref.invalidate(reportProvider);
+
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Tagihan "${bill.name}" berhasil dibayar.')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Gagal melakukan pembayaran: $e')),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Bayar Sekarang'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memuat data pembayaran: $e')),
+        );
+      }
+    }
   }
 
   void _showAddDialog(BuildContext context, WidgetRef ref) {

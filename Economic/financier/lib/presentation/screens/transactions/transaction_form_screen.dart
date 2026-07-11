@@ -80,10 +80,9 @@ class TransactionFormNotifier extends ChangeNotifier {
         final keywords = rule['keywords'] as List<String>;
         final catName = rule['cat'] as String;
         if (keywords.any((kw) => noteLower.contains(kw))) {
-          final matched = filteredCategories.firstWhere(
+          final matched = filteredCategories.where(
             (c) => c.name.toLowerCase().contains(catName.toLowerCase()) || catName.toLowerCase().contains(c.name.toLowerCase()),
-            orElse: () => null as dynamic,
-          );
+          ).firstOrNull;
           if (matched != null) {
             categoryId = matched.id;
             break;
@@ -124,11 +123,22 @@ class TransactionFormNotifier extends ChangeNotifier {
 
 class TransactionFormScreen extends ConsumerWidget {
   final String? id;
-  const TransactionFormScreen({super.key, this.id});
+  final String? type;
+  const TransactionFormScreen({super.key, this.id, this.type});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final form = ref.watch(_formProvider(id));
+
+    // Set initial type if provided and we are creating a new transaction (id is null)
+    if (id == null && type != null && form.type != type) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        form.type = type!;
+        form.categoryId = null; // Reset category
+        form.notifyListeners();
+      });
+    }
+
     final theme = Theme.of(context);
     final fmt = NumberFormat('#,###', 'id_ID');
 

@@ -33,8 +33,9 @@ final reportProvider = FutureProvider.autoDispose<ReportData>((ref) async {
   // Category breakdown
   final catSpending = <String, double>{};
   for (final tx in recentTxs.where((t) => t.type == 'expense')) {
+    final catId = tx.categoryId ?? 'uncategorized';
     catSpending.update(
-        tx.categoryId, (v) => v + tx.amount, ifAbsent: () => tx.amount);
+        catId, (v) => v + tx.amount, ifAbsent: () => tx.amount);
   }
 
   return ReportData(
@@ -330,7 +331,8 @@ class ReportScreen extends ConsumerWidget {
     // Top category
     final catMap = <String, double>{};
     for (final t in monthTx.where((t) => t.type == 'expense')) {
-      catMap.update(t.categoryId, (v) => v + t.amount, ifAbsent: () => t.amount);
+      final catId = t.categoryId ?? 'uncategorized';
+      catMap.update(catId, (v) => v + t.amount, ifAbsent: () => t.amount);
     }
     String? topCatId;
     double topCatVal = 0;

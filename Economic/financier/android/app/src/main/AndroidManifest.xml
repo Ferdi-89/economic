@@ -35,6 +35,33 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
+
+        <!-- App Widget Provider -->
+        <receiver android:name=".FinancierWidgetProvider"
+            android:exported="true"
+            android:label="Financier Summary">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/financier_widget_info" />
+        </receiver>
+
+        <!-- Transactions List Widget Provider -->
+        <receiver android:name=".FinancierListWidgetProvider"
+            android:exported="true"
+            android:label="Financier Transaksi">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/financier_list_widget_info" />
+        </receiver>
+
+        <!-- RemoteViews Service for ListView -->
+        <service android:name=".FinancierWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
     </application>
 
     <queries>
