@@ -2,6 +2,12 @@
 
 Aplikasi pencatatan keuangan modern, powerful, dan cepat. Tersedia untuk **Android** dan **Web**.
 
+## 📥 Download APK
+
+[![Download APK](https://img.shields.io/badge/Download-APK-brightgreen?style=for-the-badge&logo=android)](https://github.com/Ferdi-89/economic/releases/latest/download/app-release.apk)
+
+> Klik badge di atas untuk download APK terbaru, atau kunjungi halaman [**Releases**](https://github.com/Ferdi-89/economic/releases) untuk melihat semua versi.
+
 ## ✨ Fitur
 
 | Fitur | Status |
