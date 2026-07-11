@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financier Admin — Control Center</title>
+  <meta name="description" content="Admin dashboard untuk mengelola seluruh pengguna dan data Financier.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div id="login-screen" class="login-screen">
+  <div class="login-bg">
+    <div class="login-orb orb-1"></div>
+    <div class="login-orb orb-2"></div>
+    <div class="login-orb orb-3"></div>
+  </div>
+  <div class="login-box">
+    <div class="login-brand">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">Financier</div>
+        <div class="brand-tag">Admin Control Center</div>
+      </div>
+    </div>
+    <div id="login-error" class="login-error hidden"></div>
+    <form id="login-form">
+      <div class="field-group">
+        <label>Supabase URL</label>
+        <input type="text" id="inp-url" placeholder="https://xxx.supabase.co" autocomplete="off">
+      </div>
+      <div class="field-group">
+        <label>Service Role Key</label>
+        <div class="pw-wrap">
+          <input type="password" id="inp-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off">
+          <button type="button" class="pw-btn" id="toggle-key">
+            <svg id="eye-off" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+            <svg id="eye-on" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hidden"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="field-hint">Gunakan Service Role Key dari Supabase Dashboard → Settings → API</div>
+      </div>
+      <div class="field-group">
+        <label>Admin Password</label>
+        <input type="password" id="inp-adminpw" placeholder="Password lokal admin panel" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-login" id="btn-login">
+        <span id="login-txt">Masuk ke Admin Panel</span>
+        <div id="login-spin" class="spin hidden"></div>
+      </button>
+    </form>
+    <div class="login-note">⚠️ Hanya untuk administrator yang berwenang. Semua aksi dicatat.</div>
+  </div>
+</div>
+
+<!-- ═══ ADMIN APP ═══ -->
+<div id="admin-app" class="admin-app hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <div class="brand-icon-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span>Financier <span class="badge-admin">ADMIN</span></span>
+      </div>
+      <button class="sidebar-toggle-btn" id="sidebar-toggle">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a class="nav-item active" data-page="dashboard" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <div class="nav-section-label">Manajemen</div>
+      <a class="nav-item" data-page="users" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Pengguna</span>
+        <span class="nav-badge" id="badge-users">0</span>
+      </a>
+      <a class="nav-item" data-page="transactions" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 0-2 2h-3"/><polyline points="7 12 12 7 17 12"/><line x1="12" y1="7" x2="12" y2="17"/></svg>
+        <span>Transaksi</span>
+      </a>
+      <a class="nav-item" data-page="accounts" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <span>Rekening</span>
+      </a>
+      <a class="nav-item" data-page="budgets" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>Anggaran</span>
+      </a>
+      <a class="nav-item" data-page="categories" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><circle cx="17" cy="17" r="3"/></svg>
+        <span>Kategori</span>
+      </a>
+      <a class="nav-item" data-page="bills" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>Tagihan</span>
+      </a>
+      <a class="nav-item" data-page="goals" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        <span>Tujuan Tabungan</span>
+      </a>
+      <a class="nav-item" data-page="debts" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Hutang & Piutang</span>
+      </a>
+      <a class="nav-item" data-page="wishlist" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span>Wishlist</span>
+      </a>
+      <div class="nav-section-label">Sistem</div>
+      <a class="nav-item" data-page="analytics" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Analitik</span>
+      </a>
+      <a class="nav-item" data-page="settings" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+        <span>Pengaturan</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="admin-profile">
+        <div class="admin-avatar">A</div>
+        <div class="admin-info">
+          <div class="admin-name">Administrator</div>
+          <div class="admin-role">Super Admin</div>
+        </div>
+      </div>
+      <button class="btn-logout" id="btn-logout" title="Keluar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-wrap" id="main-wrap">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="topbar-menu-btn" id="topbar-menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 class="page-title" id="page-title">Dashboard</h1>
+      </div>
+      <div class="topbar-right">
+        <div class="connection-badge" id="conn-badge">
+          <span class="conn-dot"></span>
+          <span id="conn-label">Terhubung</span>
+        </div>
+        <div class="db-url-tag" id="db-url-tag"></div>
+        <button class="btn-refresh" id="btn-refresh" title="Refresh Data">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="page-content" id="page-content">
+
+      <!-- ═══ DASHBOARD PAGE ═══ -->
+      <section id="page-dashboard" class="page active">
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card" id="stat-users">
+            <div class="stat-icon" style="--c:#6366f1">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="stat-body">
+              <div class="stat-value" id="sv-users">—</div>
+              <div class="stat-label">Total Pengguna</div>
+              <div class="stat-sub" id="ss-users">memuat...</div>
+            </div>
+          </div>
+          <div class="stat-card" id="stat-txn">
+            <div class="stat-icon" style="--c:#10b981">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div class="stat-body">
+              <div class="stat-value" id="sv-txn">—</div>
+              <div class="stat-label">Total Transaksi</div>
+              <div class="stat-sub" id="ss-txn">memuat...</div>
+            </div>
+          </div>
+          <div class="stat-card" id="stat-acc">
+            <div class="stat-icon" style="--c:#f59e0b">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            </div>
+            <div class="stat-body">
+              <div class="stat-value" id="sv-acc">—</div>
+              <div class="stat-label">Total Rekening</div>
+              <div class="stat-sub" id="ss-acc">memuat...</div>
+            </div>
+          </div>
+          <div class="stat-card" id="stat-vol">
+            <div class="stat-icon" style="--c:#ec4899">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="stat-body">
+              <div class="stat-value" id="sv-vol">—</div>
+              <div class="stat-label">Volume Transaksi</div>
+              <div class="stat-sub" id="ss-vol">memuat...</div>
+            </div>
+          </div>
+          <div class="stat-card" id="stat-budget">
+            <div class="stat-icon" style="--c:#8b5cf6">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="stat-body">
+              <div class="stat-value" id="sv-budget">—</div>
+              <div class="stat-label">Anggaran Aktif</div>
+              <div class="stat-sub" id="ss-budget">memuat...</div>
+            </div>
+          </div>
+          <div class="stat-card" id="stat-bills">
+            <div class="stat-icon" style="--c:#ef4444">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <div class="stat-body">
+              <div class="stat-value" id="sv-bills">—</div>
+              <div class="stat-label">Tagihan Pending</div>
+              <div class="stat-sub" id="ss-bills">memuat...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-title">Transaksi 30 Hari Terakhir</div>
+              <div class="card-actions">
+                <button class="chip-btn active" data-chart="30d">30H</button>
+                <button class="chip-btn" data-chart="7d">7H</button>
+              </div>
+            </div>
+            <canvas id="chart-txn-daily" height="200"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Pengguna Terbaru</div><button class="link-btn" data-page="users">Lihat Semua</button></div>
+            <div id="recent-users" class="recent-list">
+              <div class="loading-row">Memuat...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid-3">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Transaksi Terbaru</div><button class="link-btn" data-page="transactions">Lihat Semua</button></div>
+            <div id="recent-txns" class="recent-list">
+              <div class="loading-row">Memuat...</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Distribusi Tipe Akun</div></div>
+            <canvas id="chart-account-types" height="180"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Ringkasan Sistem</div></div>
+            <div id="sys-summary" class="sys-summary">
+              <div class="loading-row">Memuat...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ USERS PAGE ═══ -->
+      <section id="page-users" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-users" placeholder="Cari pengguna...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-users-sort" class="select-sm">
+              <option value="created_at-desc">Terbaru</option>
+              <option value="created_at-asc">Terlama</option>
+              <option value="full_name-asc">Nama A-Z</option>
+              <option value="email-asc">Email A-Z</option>
+            </select>
+            <button class="btn-primary" id="btn-add-user">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Tambah User
+            </button>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table" id="table-users">
+            <thead>
+              <tr>
+                <th>Pengguna</th>
+                <th>Email</th>
+                <th>Mata Uang</th>
+                <th>Bergabung</th>
+                <th>Rekening</th>
+                <th>Transaksi</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-users"><tr><td colspan="7" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-users"></div>
+            <div class="pagination" id="pag-users"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ TRANSACTIONS PAGE ═══ -->
+      <section id="page-transactions" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-txns" placeholder="Cari transaksi...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-txn-type" class="select-sm">
+              <option value="">Semua Tipe</option>
+              <option value="income">Pemasukan</option>
+              <option value="expense">Pengeluaran</option>
+              <option value="transfer">Transfer</option>
+            </select>
+            <select id="filter-txn-status" class="select-sm">
+              <option value="">Semua Status</option>
+              <option value="completed">Selesai</option>
+              <option value="pending">Pending</option>
+              <option value="cancelled">Dibatalkan</option>
+            </select>
+            <input type="date" id="filter-txn-from" class="input-sm" title="Dari tanggal">
+            <input type="date" id="filter-txn-to" class="input-sm" title="Sampai tanggal">
+            <button class="btn-secondary" id="btn-export-txn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Ekspor CSV
+            </button>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table" id="table-txns">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Pengguna</th>
+                <th>Tipe</th>
+                <th>Kategori</th>
+                <th>Jumlah</th>
+                <th>Status</th>
+                <th>Catatan</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-txns"><tr><td colspan="8" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-txns"></div>
+            <div class="pagination" id="pag-txns"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ ACCOUNTS PAGE ═══ -->
+      <section id="page-accounts" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-accounts" placeholder="Cari rekening...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-acc-type" class="select-sm">
+              <option value="">Semua Tipe</option>
+              <option value="cash">Tunai</option>
+              <option value="bank">Bank</option>
+              <option value="ewallet">E-Wallet</option>
+              <option value="savings">Tabungan</option>
+              <option value="investment">Investasi</option>
+            </select>
+            <select id="filter-acc-status" class="select-sm">
+              <option value="">Semua Status</option>
+              <option value="active">Aktif</option>
+              <option value="archived">Diarsipkan</option>
+            </select>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nama Rekening</th>
+                <th>Pengguna</th>
+                <th>Tipe</th>
+                <th>Nama Bank</th>
+                <th>No. Rekening</th>
+                <th>Saldo</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-accounts"><tr><td colspan="8" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-accounts"></div>
+            <div class="pagination" id="pag-accounts"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ BUDGETS PAGE ═══ -->
+      <section id="page-budgets" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-budgets" placeholder="Cari anggaran...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-budget-period" class="select-sm">
+              <option value="">Semua Periode</option>
+              <option value="monthly">Bulanan</option>
+              <option value="weekly">Mingguan</option>
+              <option value="yearly">Tahunan</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nama Anggaran</th>
+                <th>Pengguna</th>
+                <th>Periode</th>
+                <th>Jumlah</th>
+                <th>Status</th>
+                <th>Dibuat</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-budgets"><tr><td colspan="7" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-budgets"></div>
+            <div class="pagination" id="pag-budgets"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ CATEGORIES PAGE ═══ -->
+      <section id="page-categories" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-categories" placeholder="Cari kategori...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-cat-type" class="select-sm">
+              <option value="">Semua Tipe</option>
+              <option value="income">Pemasukan</option>
+              <option value="expense">Pengeluaran</option>
+            </select>
+            <select id="filter-cat-scope" class="select-sm">
+              <option value="">Semua</option>
+              <option value="default">Default Sistem</option>
+              <option value="custom">Custom User</option>
+            </select>
+            <button class="btn-primary" id="btn-add-cat">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Tambah Kategori
+            </button>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nama</th>
+                <th>Tipe</th>
+                <th>Scope</th>
+                <th>Icon</th>
+                <th>Warna</th>
+                <th>Urutan</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-categories"><tr><td colspan="8" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-categories"></div>
+            <div class="pagination" id="pag-categories"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ BILLS PAGE ═══ -->
+      <section id="page-bills" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-bills" placeholder="Cari tagihan...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-bill-status" class="select-sm">
+              <option value="">Semua Status</option>
+              <option value="pending">Pending</option>
+              <option value="paid">Dibayar</option>
+            </select>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nama Tagihan</th><th>Pengguna</th><th>Jumlah</th><th>Jatuh Tempo</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="tbody-bills"><tr><td colspan="7" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-bills"></div>
+            <div class="pagination" id="pag-bills"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ GOALS PAGE ═══ -->
+      <section id="page-goals" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-goals" placeholder="Cari tujuan tabungan...">
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nama Target</th><th>Pengguna</th><th>Target</th><th>Terkumpul</th><th>Progress</th><th>Deadline</th><th>Dibuat</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="tbody-goals"><tr><td colspan="8" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-goals"></div>
+            <div class="pagination" id="pag-goals"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ DEBTS PAGE ═══ -->
+      <section id="page-debts" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-debts" placeholder="Cari hutang/piutang...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-debt-type" class="select-sm">
+              <option value="">Semua Tipe</option>
+              <option value="debt">Hutang</option>
+              <option value="loan">Piutang</option>
+            </select>
+            <select id="filter-debt-status" class="select-sm">
+              <option value="">Semua Status</option>
+              <option value="unpaid">Belum Lunas</option>
+              <option value="paid">Lunas</option>
+            </select>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nama Kontak</th><th>Pengguna</th><th>Tipe</th><th>Jumlah</th><th>Status</th><th>Jatuh Tempo</th><th>Dibuat</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="tbody-debts"><tr><td colspan="8" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-debts"></div>
+            <div class="pagination" id="pag-debts"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ WISHLIST PAGE ═══ -->
+      <section id="page-wishlist" class="page">
+        <div class="page-toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-wishlist" placeholder="Cari wishlist...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-wish-status" class="select-sm">
+              <option value="">Semua</option>
+              <option value="enabled">Aktif</option>
+              <option value="disabled">Nonaktif</option>
+            </select>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nama Item</th><th>Pengguna</th><th>Harga</th><th>URL</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="tbody-wishlist"><tr><td colspan="7" class="td-loading">Memuat data...</td></tr></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="table-info" id="info-wishlist"></div>
+            <div class="pagination" id="pag-wishlist"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ ANALYTICS PAGE ═══ -->
+      <section id="page-analytics" class="page">
+        <div class="analytics-grid">
+          <div class="card chart-card">
+            <div class="card-header"><div class="card-title">Pendapatan vs Pengeluaran (6 Bulan)</div></div>
+            <canvas id="chart-income-expense" height="220"></canvas>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header"><div class="card-title">Pertumbuhan Pengguna</div></div>
+            <canvas id="chart-user-growth" height="220"></canvas>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header"><div class="card-title">Distribusi Kategori Pengeluaran</div></div>
+            <canvas id="chart-cat-expense" height="220"></canvas>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header"><div class="card-title">Distribusi Tipe Rekening</div></div>
+            <canvas id="chart-acc-dist" height="220"></canvas>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <div class="card-header"><div class="card-title">Statistik Lengkap</div></div>
+          <div id="full-stats" class="full-stats-grid">
+            <div class="loading-row">Memuat...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ SETTINGS PAGE ═══ -->
+      <section id="page-settings" class="page">
+        <div class="settings-grid">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Konfigurasi Koneksi</div></div>
+            <div class="settings-body">
+              <div class="field-group">
+                <label>Supabase URL</label>
+                <input type="text" id="set-url" class="input-full" readonly>
+              </div>
+              <div class="field-group">
+                <label>Service Role Key</label>
+                <div class="pw-wrap">
+                  <input type="password" id="set-key" class="input-full" readonly>
+                  <button type="button" class="pw-btn" id="set-toggle-key">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </div>
+              <button class="btn-secondary" id="btn-change-conn">Ubah Koneksi</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><div class="card-title">Manajemen Admin</div></div>
+            <div class="settings-body">
+              <div class="field-group">
+                <label>Ubah Password Admin Panel</label>
+                <input type="password" id="set-newpw1" class="input-full" placeholder="Password baru">
+              </div>
+              <div class="field-group">
+                <input type="password" id="set-newpw2" class="input-full" placeholder="Konfirmasi password baru">
+              </div>
+              <button class="btn-primary" id="btn-change-pw">Simpan Password</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><div class="card-title">Operasi Database</div></div>
+            <div class="settings-body">
+              <div class="db-ops-list">
+                <div class="db-op-item">
+                  <div>
+                    <div class="db-op-title">Ekspor Semua Data</div>
+                    <div class="db-op-desc">Download semua data pengguna dalam format JSON</div>
+                  </div>
+                  <button class="btn-secondary" id="btn-export-all">Ekspor</button>
+                </div>
+                <div class="db-op-item">
+                  <div>
+                    <div class="db-op-title">Refresh Cache Stats</div>
+                    <div class="db-op-desc">Reload semua statistik dari database</div>
+                  </div>
+                  <button class="btn-secondary" id="btn-refresh-stats">Refresh</button>
+                </div>
+                <div class="db-op-item danger-op">
+                  <div>
+                    <div class="db-op-title">Hapus Data Test</div>
+                    <div class="db-op-desc">Hapus semua pengguna yang email-nya mengandung '+test'</div>
+                  </div>
+                  <button class="btn-danger" id="btn-clean-test">Bersihkan</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><div class="card-title">Log Aktivitas Admin</div></div>
+            <div id="admin-log" class="admin-log">
+              <div class="loading-row">Memuat log...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ═══ MODAL ═══ -->
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal" id="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Detail</div>
+      <button class="modal-close" id="modal-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- ═══ TOAST ═══ -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ═══ CONFIRM DIALOG ═══ -->
+<div id="confirm-overlay" class="modal-overlay hidden">
+  <div class="modal confirm-modal">
+    <div class="confirm-icon" id="confirm-icon"></div>
+    <div class="confirm-title" id="confirm-title">Konfirmasi</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="btn-secondary" id="confirm-cancel">Batal</button>
+      <button class="btn-danger" id="confirm-ok">Ya, Lanjutkan</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
