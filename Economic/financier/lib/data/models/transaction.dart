@@ -20,6 +20,7 @@ class Transaction with _$Transaction {
     @Default(false) bool isRecurring,
     String? recurringId,
     @Default('completed') String status, // completed, pending, cancelled
+    @Default(0.0) double adminFee,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) = _Transaction;

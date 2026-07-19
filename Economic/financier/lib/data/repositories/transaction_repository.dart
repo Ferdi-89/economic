@@ -44,7 +44,7 @@ class TransactionRepository {
     } else if (type == 'expense') {
       await _adjustAccountBalance(accountId, -amount);
     } else if (type == 'transfer' && toAccountId != null) {
-      await _adjustAccountBalance(accountId, -amount);
+      await _adjustAccountBalance(accountId, -(amount + tx.adminFee));
       await _adjustAccountBalance(toAccountId, amount);
     }
 
@@ -61,7 +61,7 @@ class TransactionRepository {
     } else if (oldTx.type == 'expense') {
       await _adjustAccountBalance(oldTx.accountId, oldTx.amount);
     } else if (oldTx.type == 'transfer' && oldTx.transferToAccountId != null) {
-      await _adjustAccountBalance(oldTx.accountId, oldTx.amount);
+      await _adjustAccountBalance(oldTx.accountId, oldTx.amount + oldTx.adminFee);
       await _adjustAccountBalance(oldTx.transferToAccountId!, -oldTx.amount);
     }
 
@@ -80,7 +80,7 @@ class TransactionRepository {
     } else if (type == 'expense') {
       await _adjustAccountBalance(accountId, -amount);
     } else if (type == 'transfer' && toAccountId != null) {
-      await _adjustAccountBalance(accountId, -amount);
+      await _adjustAccountBalance(accountId, -(amount + tx.adminFee));
       await _adjustAccountBalance(toAccountId, amount);
     }
 
@@ -97,7 +97,7 @@ class TransactionRepository {
     } else if (tx.type == 'expense') {
       await _adjustAccountBalance(tx.accountId, tx.amount);
     } else if (tx.type == 'transfer' && tx.transferToAccountId != null) {
-      await _adjustAccountBalance(tx.accountId, tx.amount);
+      await _adjustAccountBalance(tx.accountId, tx.amount + tx.adminFee);
       await _adjustAccountBalance(tx.transferToAccountId!, -tx.amount);
     }
 

@@ -22,7 +22,7 @@ let BUDGET_ITEMS = [];
 let chartBar   = null;
 let chartPie   = null;
 let currentTab = 'dashboard';
-let txFilter   = { q: '', type: '', month: '' };
+let txFilter   = { q: '', type: '', month: '', accountId: '', categoryId: '', startDate: '', endDate: '' };
 
 // ── Helpers ──
 const $ = id => document.getElementById(id);
@@ -278,6 +278,18 @@ function renderTransactions() {
   if (txFilter.month) {
     list = list.filter(t => t.date?.startsWith(txFilter.month));
   }
+  if (txFilter.accountId) {
+    list = list.filter(t => t.account_id === txFilter.accountId || t.transfer_to_account_id === txFilter.accountId);
+  }
+  if (txFilter.categoryId) {
+    list = list.filter(t => t.category_id === txFilter.categoryId);
+  }
+  if (txFilter.startDate) {
+    list = list.filter(t => t.date >= txFilter.startDate);
+  }
+  if (txFilter.endDate) {
+    list = list.filter(t => t.date <= txFilter.endDate);
+  }
 
   const el = $('tx-list');
   if (!list.length) {
@@ -430,6 +442,61 @@ function renderReports() {
   renderBarChart();
   renderPieChart();
   renderSummaryStats();
+  renderAccountReports();
+}
+
+function renderAccountReports() {
+  const container = $('report-accounts-list');
+  if (!container) return;
+
+  const now = monthNow();
+  const monthTx = TRANSACTIONS.filter(t => t.date?.startsWith(now));
+
+  let html = `<table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 500px;">
+    <thead>
+      <tr style="border-bottom: 1px solid var(--border-color); text-align: left;">
+        <th style="padding: 10px 8px; font-family: var(--font-display); font-weight: 700;">Nama Rekening</th>
+        <th style="padding: 10px 8px; font-family: var(--font-display); font-weight: 700;">Tipe</th>
+        <th style="padding: 10px 8px; font-family: var(--font-display); font-weight: 700; color: var(--green);">Total Masukan</th>
+        <th style="padding: 10px 8px; font-family: var(--font-display); font-weight: 700; color: var(--red);">Total Keluaran</th>
+        <th style="padding: 10px 8px; font-family: var(--font-display); font-weight: 700;">Saldo Saat Ini</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  ACCOUNTS.forEach(acc => {
+    let income = 0;
+    let expense = 0;
+
+    monthTx.forEach(t => {
+      if (t.account_id === acc.id) {
+        if (t.type === 'income') {
+          income += t.amount;
+        } else if (t.type === 'expense') {
+          expense += t.amount;
+        } else if (t.type === 'transfer') {
+          expense += (t.amount + (t.admin_fee || 0));
+        }
+      } else if (t.transfer_to_account_id === acc.id) {
+        if (t.type === 'transfer') {
+          income += t.amount;
+        }
+      }
+    });
+
+    const typeStr = { cash: 'Cash', bank: 'Bank', ewallet: 'E-Wallet', savings: 'Tabungan', investment: 'Investasi' }[acc.type] || acc.type;
+
+    html += `<tr style="border-bottom: 1px solid rgba(0,0,0,0.05);">
+      <td style="padding: 10px 8px; font-weight: 600;">${acc.name}</td>
+      <td style="padding: 10px 8px;">${typeStr}</td>
+      <td style="padding: 10px 8px; color: var(--green); font-weight: 600;">+${idr(income)}</td>
+      <td style="padding: 10px 8px; color: var(--red); font-weight: 600;">-${idr(expense)}</td>
+      <td style="padding: 10px 8px; font-weight: 700;">${idr(acc.balance || 0)}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
 }
 
 function renderSummaryStats() {
@@ -594,6 +661,9 @@ function populateSelects() {
   $('tx-account').innerHTML   = '<option value="">Pilih rekening</option>' + accOpts;
   $('tx-to-account').innerHTML = '<option value="">Pilih tujuan</option>' + accOpts;
   $('filter-account') && ($('filter-account').innerHTML = '<option value="">Semua Rekening</option>' + accOpts);
+  
+  const catOpts = CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  $('filter-category') && ($('filter-category').innerHTML = '<option value="">Semua Kategori</option>' + catOpts);
 
   // tx-category will be populated dynamically inside setTxType() to ensure cross-browser compatibility
 
@@ -643,6 +713,7 @@ function setTxType(type) {
   const isTransfer = type === 'transfer';
   $('tx-to-field').style.display  = isTransfer ? '' : 'none';
   $('tx-cat-field').style.display = isTransfer ? 'none' : '';
+  $('tx-admin-field').style.display = isTransfer ? '' : 'none';
   
   $('tx-category').required = !isTransfer;
   $('tx-to-account').required = isTransfer;
@@ -669,6 +740,7 @@ $('form-tx').addEventListener('submit', async e => {
   const date     = $('tx-date').value;
   const notes    = $('tx-note').value.trim();
   const editId   = $('tx-edit-id').value;
+  const adminFee = type === 'transfer' ? (parseFloat($('tx-admin-fee').value) || 0) : 0;
 
   if (!amount || amount <= 0) return alert('Jumlah harus lebih dari 0');
   if (!accountId) return alert('Pilih rekening');
@@ -679,7 +751,7 @@ $('form-tx').addEventListener('submit', async e => {
   try {
     if (editId) {
       const oldTx = TRANSACTIONS.find(t => t.id === editId);
-      const { error: txError } = await sb.from('transactions').update({ type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, note: notes }).eq('id', editId);
+      const { error: txError } = await sb.from('transactions').update({ type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, note: notes, admin_fee: adminFee }).eq('id', editId);
       if (txError) throw txError;
       
       if (oldTx) {
@@ -687,6 +759,9 @@ $('form-tx').addEventListener('submit', async e => {
         const oldAcc = ACCOUNTS.find(a => a.id === oldTx.account_id);
         if (oldAcc) {
           let revDelta = oldTx.type === 'income' ? -oldTx.amount : oldTx.amount;
+          if (oldTx.type === 'transfer') {
+            revDelta += (oldTx.admin_fee || 0);
+          }
           let newBal = (oldAcc.balance || 0) + revDelta;
           const { error: accErr1 } = await sb.from('accounts').update({ balance: newBal }).eq('id', oldTx.account_id);
           if (accErr1) throw accErr1;
@@ -709,6 +784,9 @@ $('form-tx').addEventListener('submit', async e => {
         const newAcc = ACCOUNTS.find(a => a.id === accountId);
         if (newAcc) {
           let newDelta = type === 'income' ? amount : -amount;
+          if (type === 'transfer') {
+            newDelta -= adminFee;
+          }
           const { error: accErr3 } = await sb.from('accounts').update({ balance: (newAcc.balance || 0) + newDelta }).eq('id', accountId);
           if (accErr3) throw accErr3;
         }
@@ -721,12 +799,15 @@ $('form-tx').addEventListener('submit', async e => {
         }
       }
     } else {
-      const { error: txError } = await sb.from('transactions').insert({ user_id: USER.id, type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, note: notes });
+      const { error: txError } = await sb.from('transactions').insert({ user_id: USER.id, type, amount, account_id: accountId, category_id: catId || null, transfer_to_account_id: toAccId || null, date, note: notes, admin_fee: adminFee });
       if (txError) throw txError;
       // Update balance
       const account = ACCOUNTS.find(a => a.id === accountId);
       if (account) {
-        const delta = type === 'income' ? amount : -amount;
+        let delta = type === 'income' ? amount : -amount;
+        if (type === 'transfer') {
+          delta -= adminFee;
+        }
         const { error: accErr5 } = await sb.from('accounts').update({ balance: (account.balance || 0) + delta }).eq('id', accountId);
         if (accErr5) throw accErr5;
         if (type === 'transfer' && toAccId) {
@@ -741,6 +822,7 @@ $('form-tx').addEventListener('submit', async e => {
     closeModal('modal-tx');
     await loadAll();
     renderAll();
+    switchTab('transactions');
   } catch(err) {
     alert('Gagal menyimpan transaksi: ' + err.message);
   } finally {
@@ -760,6 +842,7 @@ async function editTx(id) {
   $('tx-account').value    = t.account_id || '';
   $('tx-category').value   = t.category_id || '';
   $('tx-to-account').value = t.transfer_to_account_id || '';
+  $('tx-admin-fee').value  = t.admin_fee || '';
   openModal('modal-tx');
 }
 
@@ -772,7 +855,10 @@ async function deleteTx(id) {
     if (t) {
       const account = ACCOUNTS.find(a => a.id === t.account_id);
       if (account) {
-        const delta = t.type === 'income' ? -t.amount : t.type === 'expense' ? t.amount : t.amount;
+        let delta = t.type === 'income' ? -t.amount : t.type === 'expense' ? t.amount : t.amount;
+        if (t.type === 'transfer') {
+          delta += (t.admin_fee || 0);
+        }
         await sb.from('accounts').update({ balance: (account.balance || 0) + delta }).eq('id', t.account_id);
         if (t.type === 'transfer' && t.transfer_to_account_id) {
           const toAcc = ACCOUNTS.find(a => a.id === t.transfer_to_account_id);
@@ -979,12 +1065,20 @@ function updateThemeIcon(theme) {
 // ── Filter Listeners ──
 $('filter-q').addEventListener('input', e => { txFilter.q = e.target.value; renderTransactions(); });
 $('filter-type').addEventListener('change', e => { txFilter.type = e.target.value; renderTransactions(); });
+$('filter-account').addEventListener('change', e => { txFilter.accountId = e.target.value; renderTransactions(); });
+$('filter-category').addEventListener('change', e => { txFilter.categoryId = e.target.value; renderTransactions(); });
 $('filter-month').addEventListener('change', e => { txFilter.month = e.target.value; renderTransactions(); });
+$('filter-start-date').addEventListener('change', e => { txFilter.startDate = e.target.value; renderTransactions(); });
+$('filter-end-date').addEventListener('change', e => { txFilter.endDate = e.target.value; renderTransactions(); });
 $('btn-reset-filter').addEventListener('click', () => {
-  txFilter = { q:'', type:'', month: monthNow() };
+  txFilter = { q:'', type:'', month: monthNow(), accountId: '', categoryId: '', startDate: '', endDate: '' };
   $('filter-q').value = '';
   $('filter-type').value = '';
+  $('filter-account').value = '';
+  $('filter-category').value = '';
   $('filter-month').value = monthNow();
+  $('filter-start-date').value = '';
+  $('filter-end-date').value = '';
   renderTransactions();
 });
 

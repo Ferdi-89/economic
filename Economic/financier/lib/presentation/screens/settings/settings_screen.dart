@@ -81,17 +81,23 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _handleSync(BuildContext context) async {
+    BuildContext? dialogContext;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(child: CircularProgressIndicator());
+      },
     );
 
     // Simulate network sync with Supabase
     await Future.delayed(const Duration(milliseconds: 1200));
 
+    if (dialogContext != null && dialogContext!.mounted) {
+      Navigator.of(dialogContext!).pop(); // Close loading indicator safely
+    }
     if (context.mounted) {
-      Navigator.pop(context); // Close loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(

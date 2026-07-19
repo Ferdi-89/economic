@@ -6,14 +6,17 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/transaction_repository.dart';
 import '../../../data/repositories/category_repository.dart';
+import '../../../data/repositories/account_repository.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/category.dart';
+import '../../../data/models/account.dart';
 import '../../widgets/transaction_tile.dart';
 
 final reportProvider = FutureProvider.autoDispose<ReportData>((ref) async {
   final userId = ref.read(authRepositoryProvider).currentUser!.id;
   final txRepo = ref.read(transactionRepositoryProvider);
   final catRepo = ref.read(categoryRepositoryProvider);
+  final accRepo = ref.read(accountRepositoryProvider);
 
   final now = DateTime.now();
   final months = List.generate(6, (i) => DateTime(now.year, now.month - i, 1));
@@ -27,6 +30,7 @@ final reportProvider = FutureProvider.autoDispose<ReportData>((ref) async {
   }));
 
   final categories = await catRepo.getAll(userId, type: 'expense');
+  final accounts = await accRepo.getAll(userId);
   final recentTxs = await txRepo.getAll(
       userId, startDate: months.last, endDate: now, limit: 500);
 
@@ -38,12 +42,37 @@ final reportProvider = FutureProvider.autoDispose<ReportData>((ref) async {
         catId, (v) => v + tx.amount, ifAbsent: () => tx.amount);
   }
 
+  // Account stats (Masukan & Keluaran per Rekening)
+  final accountStats = <String, ({double income, double expense})>{};
+  for (final acc in accounts) {
+    double income = 0;
+    double expense = 0;
+    for (final tx in recentTxs) {
+      if (tx.accountId == acc.id) {
+        if (tx.type == 'income') {
+          income += tx.amount;
+        } else if (tx.type == 'expense') {
+          expense += tx.amount;
+        } else if (tx.type == 'transfer') {
+          expense += (tx.amount + tx.adminFee);
+        }
+      } else if (tx.transferToAccountId == acc.id) {
+        if (tx.type == 'transfer') {
+          income += tx.amount;
+        }
+      }
+    }
+    accountStats[acc.id] = (income: income, expense: expense);
+  }
+
   return ReportData(
       monthlyData: monthData.reversed.toList(),
       categories: categories,
       catSpending: catSpending,
       recentTransactions: recentTxs,
-      allTransactions: recentTxs);
+      allTransactions: recentTxs,
+      accounts: accounts,
+      accountStats: accountStats);
 });
 
 class ReportData {
@@ -52,6 +81,8 @@ class ReportData {
   final Map<String, double> catSpending;
   final List<Transaction> recentTransactions;
   final List<Transaction> allTransactions;
+  final List<Account> accounts;
+  final Map<String, ({double income, double expense})> accountStats;
 
   ReportData({
     required this.monthlyData,
@@ -59,6 +90,8 @@ class ReportData {
     required this.catSpending,
     required this.recentTransactions,
     required this.allTransactions,
+    required this.accounts,
+    required this.accountStats,
   });
 }
 
@@ -240,6 +273,99 @@ class ReportScreen extends ConsumerWidget {
                           child: Center(
                             child: Text(
                               'Belum ada data pengeluaran',
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Arus Kas per Rekening / Tabungan',
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 16),
+                      ...d.accounts.map((acc) {
+                        final stats = d.accountStats[acc.id] ?? (income: 0.0, expense: 0.0);
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    acc.type == 'bank'
+                                        ? Icons.account_balance
+                                        : acc.type == 'cash'
+                                            ? Icons.money
+                                            : acc.type == 'ewallet'
+                                                ? Icons.account_balance_wallet
+                                                : Icons.savings,
+                                    size: 16,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      acc.name,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  Text(
+                                    'Saldo: Rp${fmt.format(acc.balance.toInt())}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 24),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'Masukan: +Rp${fmt.format(stats.income.toInt())}',
+                                      style: const TextStyle(
+                                          color: Colors.green, fontSize: 11, fontWeight: FontWeight.w500),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Text(
+                                      'Keluaran: -Rp${fmt.format(stats.expense.toInt())}',
+                                      style: const TextStyle(
+                                          color: Colors.red, fontSize: 11, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Divider(height: 1),
+                            ],
+                          ),
+                        );
+                      }),
+                      if (d.accounts.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Center(
+                            child: Text(
+                              'Belum ada rekening terdaftar',
                               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                             ),
                           ),

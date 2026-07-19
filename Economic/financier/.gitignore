@@ -37,3 +37,6 @@ web/favicon.png
 
 # Supabase
 supabase/.temp
+
+# Build logs
+*_log.txt

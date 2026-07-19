@@ -31,6 +31,7 @@ class TransactionFormNotifier extends ChangeNotifier {
   String? categoryId;
   String? transferToAccountId;
   double amount = 0;
+  double adminFee = 0;
   DateTime date = DateTime.now();
   String note = '';
   bool loading = false;
@@ -54,6 +55,7 @@ class TransactionFormNotifier extends ChangeNotifier {
       categoryId = tx.categoryId;
       transferToAccountId = tx.transferToAccountId;
       amount = tx.amount;
+      adminFee = tx.adminFee;
       date = tx.date;
       note = tx.note ?? '';
     }
@@ -108,6 +110,7 @@ class TransactionFormNotifier extends ChangeNotifier {
         'date': date.toIso8601String(),
         'note': note,
         if (type == 'transfer') 'transfer_to_account_id': transferToAccountId,
+        if (type == 'transfer') 'admin_fee': adminFee,
       };
       if (editingId != null) {
         await ref.read(transactionRepositoryProvider).update(editingId!, data);
@@ -220,6 +223,20 @@ class TransactionFormScreen extends ConsumerWidget {
                 theme: theme,
                 fmt: fmt,
               ),
+              const SizedBox(height: 20),
+              TextFormField(
+                key: ValueKey(form.editingId != null ? 'edit_admin_fee_${form.adminFee}' : 'new_admin_fee'),
+                initialValue: form.adminFee > 0 ? form.adminFee.toInt().toString() : '',
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Biaya Admin (opsional)',
+                  prefixText: 'Rp ',
+                  prefixIcon: Icon(Icons.receipt_long_outlined),
+                ),
+                onChanged: (v) {
+                  form.adminFee = double.tryParse(v.replaceAll('.', '')) ?? 0;
+                },
+              ),
             ],
             if (form.type != 'transfer') ...[
               const SizedBox(height: 20),
@@ -286,7 +303,7 @@ class TransactionFormScreen extends ConsumerWidget {
                         );
                         return;
                       }
-                      if (form.categoryId == null) {
+                      if (form.type != 'transfer' && form.categoryId == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Pilih Kategori terlebih dahulu')),
                         );
@@ -312,7 +329,7 @@ class TransactionFormScreen extends ConsumerWidget {
                                 : 'Transaksi berhasil ditambahkan'),
                           ),
                         );
-                        context.pop();
+                        context.go('/transactions');
                       }
                     },
               style: FilledButton.styleFrom(
