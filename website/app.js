@@ -1067,16 +1067,39 @@ $('filter-q').addEventListener('input', e => { txFilter.q = e.target.value; rend
 $('filter-type').addEventListener('change', e => { txFilter.type = e.target.value; renderTransactions(); });
 $('filter-account').addEventListener('change', e => { txFilter.accountId = e.target.value; renderTransactions(); });
 $('filter-category').addEventListener('change', e => { txFilter.categoryId = e.target.value; renderTransactions(); });
-$('filter-month').addEventListener('change', e => { txFilter.month = e.target.value; renderTransactions(); });
-$('filter-start-date').addEventListener('change', e => { txFilter.startDate = e.target.value; renderTransactions(); });
-$('filter-end-date').addEventListener('change', e => { txFilter.endDate = e.target.value; renderTransactions(); });
+$('filter-month').addEventListener('change', e => { 
+  txFilter.month = e.target.value; 
+  if (e.target.value) {
+    txFilter.startDate = '';
+    txFilter.endDate = '';
+    $('filter-start-date').value = '';
+    $('filter-end-date').value = '';
+  }
+  renderTransactions(); 
+});
+$('filter-start-date').addEventListener('change', e => { 
+  txFilter.startDate = e.target.value; 
+  if (e.target.value) {
+    txFilter.month = '';
+    $('filter-month').value = '';
+  }
+  renderTransactions(); 
+});
+$('filter-end-date').addEventListener('change', e => { 
+  txFilter.endDate = e.target.value; 
+  if (e.target.value) {
+    txFilter.month = '';
+    $('filter-month').value = '';
+  }
+  renderTransactions(); 
+});
 $('btn-reset-filter').addEventListener('click', () => {
-  txFilter = { q:'', type:'', month: monthNow(), accountId: '', categoryId: '', startDate: '', endDate: '' };
+  txFilter = { q:'', type:'', month: '', accountId: '', categoryId: '', startDate: '', endDate: '' };
   $('filter-q').value = '';
   $('filter-type').value = '';
   $('filter-account').value = '';
   $('filter-category').value = '';
-  $('filter-month').value = monthNow();
+  $('filter-month').value = '';
   $('filter-start-date').value = '';
   $('filter-end-date').value = '';
   renderTransactions();
