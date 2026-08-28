@@ -1889,21 +1889,61 @@ function initCatauth() {
     linkId: 'lnk_alpha_portal',
     theme: currentTheme === 'light' ? 'light' : 'dark',
     text: 'Sign in with Catauth NFC',
-    onSuccess: function(authData) {
+    onSuccess: async function(authData) {
       console.log('Login Berhasil!', authData);
-      // authData.user -> { user_id, name, card_id, card_label }
-      // authData.auth_token -> Signed JWT Token
-      localStorage.setItem('auth_token', authData.auth_token);
-      if (authData.user) {
-        localStorage.setItem('catauth_user', JSON.stringify(authData.user));
+      showLoader();
+      try {
+        localStorage.setItem('auth_token', authData.auth_token);
+        
+        const userEmail = authData.user?.email || authData.user?.card_label;
+        const cardId = authData.user?.card_id;
+
+        let matchedUserId = authData.user?.user_id;
+        let matchedEmail = userEmail || 'nfc_user@catauth';
+        let matchedName = authData.user?.name || 'Catauth User';
+
+        // Cari profil di database Supabase berdasarkan email atau nfc_card_id
+        if (userEmail || cardId) {
+          try {
+            let query = sb.from('profiles').select('*');
+            if (userEmail && cardId) {
+              query = query.or(`email.ilike.${userEmail},nfc_card_id.eq.${cardId}`);
+            } else if (userEmail) {
+              query = query.ilike('email', userEmail);
+            } else if (cardId) {
+              query = query.eq('nfc_card_id', cardId);
+            }
+            const { data: profile } = await query.maybeSingle();
+            if (profile) {
+              console.log('Profil Supabase cocok:', profile);
+              matchedUserId = profile.id;
+              matchedEmail = profile.email || matchedEmail;
+              matchedName = profile.full_name || matchedName;
+            }
+          } catch(dbErr) {
+            console.warn('Gagal mencari profil Supabase terkait:', dbErr);
+          }
+        }
+
+        const sessionUser = {
+          id: matchedUserId,
+          email: matchedEmail,
+          user_metadata: { full_name: matchedName, card_id: cardId }
+        };
+
+        localStorage.setItem('catauth_user', JSON.stringify(sessionUser));
+        USER = sessionUser;
+        await showApp();
+      } catch (err) {
+        console.error('Error saat inisialisasi sesi Catauth:', err);
         USER = {
-          id: authData.user.user_id,
-          email: authData.user.card_label || authData.user.name || 'nfc_user@catauth',
-          user_metadata: { full_name: authData.user.name || 'Catauth User' }
+          id: authData.user?.user_id,
+          email: authData.user?.email || authData.user?.card_label || 'nfc_user@catauth',
+          user_metadata: { full_name: authData.user?.name || 'Catauth User' }
         };
         showApp();
-      } else {
-        window.location.href = '/dashboard';
+      } finally {
+        hideLoader();
       }
     },
     onError: function(err) {
