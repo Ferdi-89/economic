@@ -44,15 +44,16 @@ sb.auth.onAuthStateChange((_event, session) => {
     showApp();
   } else {
     // Check if logged in via Catauth NFC
-    const savedCatauthUser = localStorage.getItem('catauth_user');
-    const savedAuthToken = localStorage.getItem('auth_token');
+    const savedCatauthUser = localStorage.getItem('financier_auth_user') || localStorage.getItem('currentUser') || localStorage.getItem('catauth_user');
+    const savedAuthToken = localStorage.getItem('financier_jwt_token') || localStorage.getItem('authToken') || localStorage.getItem('auth_token');
     if (savedCatauthUser && savedAuthToken) {
       try {
         const u = JSON.parse(savedCatauthUser);
         USER = {
-          id: u.user_id,
-          email: u.card_label || u.name || 'nfc_user@catauth',
-          user_metadata: { full_name: u.name || 'Catauth User' }
+          id: u.id || u.user_id,
+          email: u.email || u.card_label || u.name || 'nfc_user@catauth',
+          role: u.role || 'User',
+          user_metadata: { full_name: u.name || 'Catauth User', card_id: u.card_id || u.card, role: u.role }
         };
         showApp();
         return;
@@ -1070,8 +1071,12 @@ function translateAuthError(msg) {
 
 $('btn-logout').addEventListener('click', async () => {
   if (!confirm('Yakin ingin keluar?')) return;
-  localStorage.removeItem('auth_token');
+  localStorage.removeItem('financier_auth_user');
+  localStorage.removeItem('currentUser');
   localStorage.removeItem('catauth_user');
+  localStorage.removeItem('financier_jwt_token');
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('auth_token');
   await sb.auth.signOut();
   USER = null;
   showAuthScreen();
@@ -1891,7 +1896,7 @@ if (btnExportCsv) {
   });
 }
 
-// ── Catauth NFC Auth Integration ──
+// ── Catauth NFC Auth Integration (Zero-Trust Compatible) ──
 function initCatauth() {
   const container = $('catauth-login-container');
   if (!container || !window.Catauth) return;
@@ -1903,19 +1908,20 @@ function initCatauth() {
     theme: currentTheme === 'light' ? 'light' : 'dark',
     text: 'Sign in with Catauth NFC',
     onSuccess: async function(authData) {
-      console.log('Login Berhasil!', authData);
+      const user = authData.user || {};
+      const token = authData.auth_token;
+      console.log('✅ Autentikasi NFC Berhasil:', user);
       showLoader();
       try {
-        localStorage.setItem('auth_token', authData.auth_token);
-        
-        const userEmail = authData.user?.email || authData.user?.card_label;
-        const cardId = authData.user?.card_id;
+        const userEmail = user.email || user.card_label;
+        const cardId = user.card_id;
+        const userRole = user.role || 'User';
 
-        let matchedUserId = authData.user?.user_id;
+        let matchedUserId = user.user_id;
         let matchedEmail = userEmail || 'nfc_user@catauth';
-        let matchedName = authData.user?.name || 'Catauth User';
+        let matchedName = user.name || 'Catauth User';
 
-        // Cari profil di database Supabase berdasarkan email atau nfc_card_id
+        // 1. Cari profil di database Supabase berdasarkan email atau nfc_card_id
         if (userEmail || cardId) {
           try {
             let query = sb.from('profiles').select('*');
@@ -1940,19 +1946,35 @@ function initCatauth() {
 
         const sessionUser = {
           id: matchedUserId,
+          name: matchedName,
           email: matchedEmail,
-          user_metadata: { full_name: matchedName, card_id: cardId }
+          role: userRole,
+          card: user.card_label || cardId,
+          card_id: cardId,
+          user_metadata: { full_name: matchedName, card_id: cardId, role: userRole }
         };
 
+        // Simpan ke LocalStorage sesuai standar Financier & Zero-Trust
+        localStorage.setItem('financier_auth_user', JSON.stringify(sessionUser));
+        localStorage.setItem('currentUser', JSON.stringify(sessionUser));
         localStorage.setItem('catauth_user', JSON.stringify(sessionUser));
+        localStorage.setItem('financier_jwt_token', token);
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('auth_token', token);
+
         USER = sessionUser;
+        
+        alert(`Login Berhasil! Selamat datang, ${matchedName} (${userRole})`);
+
         await showApp();
       } catch (err) {
         console.error('Error saat inisialisasi sesi Catauth:', err);
         USER = {
-          id: authData.user?.user_id,
-          email: authData.user?.email || authData.user?.card_label || 'nfc_user@catauth',
-          user_metadata: { full_name: authData.user?.name || 'Catauth User' }
+          id: user.user_id,
+          name: user.name || 'Catauth User',
+          email: user.email || user.card_label || 'nfc_user@catauth',
+          role: user.role || 'User',
+          user_metadata: { full_name: user.name || 'Catauth User' }
         };
         showApp();
       } finally {
@@ -1960,7 +1982,8 @@ function initCatauth() {
       }
     },
     onError: function(err) {
-      alert('Login Gagal: ' + (err && err.message ? err.message : err));
+      console.warn('Login NFC Ditolak:', err);
+      alert(`⛔ Akses Ditolak: ${err && err.message ? err.message : err}`);
     }
   });
 }
