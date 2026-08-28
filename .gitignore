@@ -12,3 +12,8 @@ Thumbs.db
 # Env
 .env
 .env.local
+
+# Logs and temp
+*.log
+.kotlin/
+*_log.txt

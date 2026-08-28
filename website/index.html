@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="/style.css">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <!-- 1. Pasang Script SDK Catauth di website Anda -->
+  <script src="https://catauth-tgng.vercel.app/sdk/catauth.js"></script>
   <script defer src="/app.js"></script>
 </head>
 <body>
@@ -66,6 +68,16 @@
           <div id="auth-btn-spinner" class="btn-spinner hidden"></div>
         </button>
       </form>
+
+      <!-- Divider / Or -->
+      <div class="auth-divider" style="display:flex; align-items:center; margin:16px 0 12px; color:var(--text-muted); font-size:11px;">
+        <div style="flex:1; height:1px; background:var(--border);"></div>
+        <span style="padding:0 10px; text-transform:uppercase; letter-spacing:0.5px;">atau</span>
+        <div style="flex:1; height:1px; background:var(--border);"></div>
+      </div>
+
+      <!-- 2. Tambahkan wadah tombol Login -->
+      <div id="catauth-login-container" style="margin-bottom:8px;"></div>
 
       <div class="auth-switch-row">
         <span id="auth-switch-label">Belum punya akun?</span>

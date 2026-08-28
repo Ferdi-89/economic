@@ -43,6 +43,23 @@ sb.auth.onAuthStateChange((_event, session) => {
     USER = session.user;
     showApp();
   } else {
+    // Check if logged in via Catauth NFC
+    const savedCatauthUser = localStorage.getItem('catauth_user');
+    const savedAuthToken = localStorage.getItem('auth_token');
+    if (savedCatauthUser && savedAuthToken) {
+      try {
+        const u = JSON.parse(savedCatauthUser);
+        USER = {
+          id: u.user_id,
+          email: u.card_label || u.name || 'nfc_user@catauth',
+          user_metadata: { full_name: u.name || 'Catauth User' }
+        };
+        showApp();
+        return;
+      } catch (e) {
+        console.error('Error reading catauth session:', e);
+      }
+    }
     USER = null;
     showAuthScreen();
   }
@@ -54,6 +71,7 @@ function showAuthScreen() {
   hideLoader();
   hide('app');
   show('auth-screen');
+  initCatauth();
 }
 
 async function showApp() {
@@ -1039,7 +1057,11 @@ function translateAuthError(msg) {
 
 $('btn-logout').addEventListener('click', async () => {
   if (!confirm('Yakin ingin keluar?')) return;
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('catauth_user');
   await sb.auth.signOut();
+  USER = null;
+  showAuthScreen();
 });
 
 // ── Theme ──
@@ -1055,6 +1077,7 @@ function toggleTheme() {
   document.documentElement.dataset.theme = next;
   localStorage.setItem('theme', next);
   updateThemeIcon(next);
+  initCatauth();
 }
 
 function updateThemeIcon(theme) {
@@ -1855,6 +1878,41 @@ if (btnExportCsv) {
   });
 }
 
-// ── Init theme and wishlist ──
+// ── Catauth NFC Auth Integration ──
+function initCatauth() {
+  const container = $('catauth-login-container');
+  if (!container || !window.Catauth) return;
+
+  const currentTheme = document.documentElement.dataset.theme || 'dark';
+
+  Catauth.renderButton('#catauth-login-container', {
+    linkId: 'lnk_alpha_portal',
+    theme: currentTheme === 'light' ? 'light' : 'dark',
+    text: 'Sign in with Catauth NFC',
+    onSuccess: function(authData) {
+      console.log('Login Berhasil!', authData);
+      // authData.user -> { user_id, name, card_id, card_label }
+      // authData.auth_token -> Signed JWT Token
+      localStorage.setItem('auth_token', authData.auth_token);
+      if (authData.user) {
+        localStorage.setItem('catauth_user', JSON.stringify(authData.user));
+        USER = {
+          id: authData.user.user_id,
+          email: authData.user.card_label || authData.user.name || 'nfc_user@catauth',
+          user_metadata: { full_name: authData.user.name || 'Catauth User' }
+        };
+        showApp();
+      } else {
+        window.location.href = '/dashboard';
+      }
+    },
+    onError: function(err) {
+      alert('Login Gagal: ' + (err && err.message ? err.message : err));
+    }
+  });
+}
+
+// ── Init theme, wishlist, and catauth ──
 initTheme();
 initWishlist();
+initCatauth();
