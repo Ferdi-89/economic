@@ -139,6 +139,10 @@
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Hutang
       </a>
+      <a href="#" class="nav-item" data-tab="settings">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Pengaturan
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -411,6 +415,53 @@
           </div>
           <div class="card-body" style="padding: 0;">
             <div id="debts-list" class="mini-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS (PENGATURAN & KONEKSI NFC) -->
+      <section id="tab-settings" class="panel hidden">
+        <div class="card" style="max-width: 680px; margin: 0 auto 20px;">
+          <div class="card-head">
+            <span class="card-title"><span class="card-title-dot" style="background:var(--brand)"></span> Profil Pengguna</span>
+          </div>
+          <div class="card-body" style="padding: 20px;">
+            <div style="display:flex; align-items:center; gap:16px; margin-bottom: 12px;">
+              <div class="user-avatar" id="settings-avatar" style="width:48px; height:48px; font-size:18px; border-radius:50%; background:var(--brand-subtle); color:var(--brand); display:flex; align-items:center; justify-content:center; font-weight:700;">U</div>
+              <div>
+                <div id="settings-name" style="font-size:16px; font-weight:700; color:var(--text-primary);">Pengguna</div>
+                <div id="settings-email" style="font-size:12.5px; color:var(--text-secondary);">user@email.com</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="max-width: 680px; margin: 0 auto 20px;">
+          <div class="card-head">
+            <span class="card-title"><span class="card-title-dot" style="background:var(--green)"></span> Otentikasi Kartu Fisik NFC (Catauth)</span>
+          </div>
+          <div class="card-body" style="padding: 20px;">
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; line-height:1.6;">
+              Hubungkan kartu fisik (e-KTP, e-Money, Flazz, atau kartu NFC Catauth) ke akun Anda. Setelah terhubung, Anda dapat login instan cukup dengan 1x tap kartu tanpa perlu mengetik password lagi.
+            </p>
+
+            <div id="nfc-status-box" style="background:var(--bg-base); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-weight:600; font-size:13px; color:var(--text-primary);" id="nfc-card-status-title">Status Kartu NFC</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;" id="nfc-card-status-desc">Memeriksa status kartu...</div>
+              </div>
+              <div id="nfc-badge" style="font-size:11px; padding:4px 8px; border-radius:var(--radius-sm); font-weight:600; background:var(--border-strong); color:var(--text-muted);">Belum Terhubung</div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+              <button type="button" class="btn btn-primary" id="btn-bind-nfc" style="display:inline-flex; align-items:center; gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                <span id="btn-bind-nfc-text">📲 Hubungkan Kartu Fisik NFC</span>
+              </button>
+              <button type="button" class="btn btn-danger hidden" id="btn-unbind-nfc" style="display:inline-flex; align-items:center; gap:6px;">
+                Putuskan Kartu
+              </button>
+            </div>
           </div>
         </div>
       </section>

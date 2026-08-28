@@ -704,13 +704,26 @@ function populateSelects() {
 function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
-  document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(n => {
+  document.querySelectorAll('.nav-item, .bottom-nav-item, .bnav-item').forEach(n => {
     n.classList.toggle('active', n.dataset.tab === tab);
   });
   const panel = $(`tab-${tab}`);
   if (panel) panel.classList.remove('hidden');
-  $('page-title').textContent = { dashboard:'Dashboard', transactions:'Transaksi', accounts:'Rekening', budgets:'Anggaran', reports:'Laporan' }[tab] || tab;
+  const titleMap = {
+    dashboard: 'Dashboard',
+    transactions: 'Transaksi',
+    accounts: 'Rekening',
+    budgets: 'Anggaran',
+    reports: 'Laporan',
+    wishlist: 'Simulasi Wishlist',
+    bills: 'Tagihan',
+    goals: 'Tabungan',
+    debts: 'Hutang & Piutang',
+    settings: 'Pengaturan'
+  };
+  $('page-title').textContent = titleMap[tab] || tab;
   if (tab === 'reports') renderReports();
+  if (tab === 'settings') renderSettings();
 }
 
 // ── CRUD: Transactions ──
@@ -1948,6 +1961,121 @@ function initCatauth() {
     },
     onError: function(err) {
       alert('Login Gagal: ' + (err && err.message ? err.message : err));
+    }
+  });
+}
+
+// ── Settings & NFC Binding ──
+async function renderSettings() {
+  if (!USER) return;
+  const name  = USER?.user_metadata?.full_name || USER?.name || USER?.email?.split('@')[0] || 'Pengguna';
+  const email = USER?.email || '';
+  const init  = name.charAt(0).toUpperCase();
+
+  const avatarEl = $('settings-avatar');
+  const nameEl = $('settings-name');
+  const emailEl = $('settings-email');
+  if (avatarEl) avatarEl.textContent = init;
+  if (nameEl) nameEl.textContent = name;
+  if (emailEl) emailEl.textContent = email;
+
+  let currentCardId = USER?.user_metadata?.card_id;
+
+  // Check from Supabase profiles if possible
+  if (USER.id && !currentCardId) {
+    try {
+      const { data: profile } = await sb.from('profiles').select('nfc_card_id').eq('id', USER.id).maybeSingle();
+      if (profile?.nfc_card_id) {
+        currentCardId = profile.nfc_card_id;
+        USER.user_metadata = { ...(USER.user_metadata || {}), card_id: currentCardId };
+        localStorage.setItem('catauth_user', JSON.stringify(USER));
+      }
+    } catch (e) {
+      console.warn('Error fetching profile card_id:', e);
+    }
+  }
+
+  const descEl = $('nfc-card-status-desc');
+  const badgeEl = $('nfc-badge');
+  const btnUnbind = $('btn-unbind-nfc');
+  const btnBindText = $('btn-bind-nfc-text');
+
+  if (currentCardId) {
+    if (descEl) descEl.textContent = `Terhubung ke kartu: ${currentCardId}`;
+    if (badgeEl) {
+      badgeEl.textContent = 'Terhubung';
+      badgeEl.style.background = 'var(--green-subtle)';
+      badgeEl.style.color = 'var(--green)';
+    }
+    if (btnUnbind) btnUnbind.classList.remove('hidden');
+    if (btnBindText) btnBindText.textContent = 'Ganti Kartu NFC';
+  } else {
+    if (descEl) descEl.textContent = 'Belum ada kartu fisik yang dihubungkan ke akun ini.';
+    if (badgeEl) {
+      badgeEl.textContent = 'Belum Terhubung';
+      badgeEl.style.background = 'var(--border-strong)';
+      badgeEl.style.color = 'var(--text-muted)';
+    }
+    if (btnUnbind) btnUnbind.classList.add('hidden');
+    if (btnBindText) btnBindText.textContent = '📲 Hubungkan Kartu Fisik NFC';
+  }
+}
+
+// Bind NFC Card button listener
+const btnBindNfc = $('btn-bind-nfc');
+if (btnBindNfc) {
+  btnBindNfc.addEventListener('click', async () => {
+    if (!window.Catauth) return alert('SDK Catauth belum termuat.');
+    showLoader();
+    try {
+      const authData = await Catauth.loginWithNFC({ linkId: 'lnk_alpha_portal' });
+      if (authData && authData.user) {
+        const cardId = authData.user.card_id || ('NFC-UID-' + (authData.user.user_id || 'UNKNOWN').slice(0,8).toUpperCase());
+        
+        // Simpan ke database Supabase
+        if (USER && USER.id) {
+          try {
+            await sb.from('profiles').update({ nfc_card_id: cardId }).eq('id', USER.id);
+          } catch(e) {
+            console.warn('Gagal update profiles nfc_card_id di db:', e);
+          }
+        }
+        
+        USER.user_metadata = { ...(USER.user_metadata || {}), card_id: cardId };
+        localStorage.setItem('catauth_user', JSON.stringify(USER));
+        alert(`Kartu Berhasil Dihubungkan! (${cardId})\nAnda sekarang dapat login instan menggunakan kartu ini.`);
+        renderSettings();
+      }
+    } catch(err) {
+      alert('Gagal menghubungkan kartu: ' + (err && err.message ? err.message : err));
+    } finally {
+      hideLoader();
+    }
+  });
+}
+
+// Unbind NFC Card button listener
+const btnUnbindNfc = $('btn-unbind-nfc');
+if (btnUnbindNfc) {
+  btnUnbindNfc.addEventListener('click', async () => {
+    if (!confirm('Yakin ingin memutuskan hubungan kartu NFC dari akun ini?')) return;
+    showLoader();
+    try {
+      if (USER && USER.id) {
+        try {
+          await sb.from('profiles').update({ nfc_card_id: null }).eq('id', USER.id);
+        } catch(e) {
+          console.warn('Gagal reset nfc_card_id:', e);
+        }
+      }
+      if (USER.user_metadata) delete USER.user_metadata.card_id;
+      localStorage.setItem('catauth_user', JSON.stringify(USER));
+      alert('Kartu NFC berhasil diputuskan.');
+      renderSettings();
+    } catch(err) {
+      alert('Gagal memutuskan kartu: ' + err.message);
+    } finally {
+      hideLoader();
     }
   });
 }
